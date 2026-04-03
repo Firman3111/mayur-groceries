@@ -1,0 +1,398 @@
+/* Casa Ruva Color Palette 
+   Primary: Fresh Green (Sayur)
+   Secondary: Bright Yellow (Bumbu/Aksen)
+   Accent: Soft Orange/Coral (Buah)
+*/
+
+:root {
+    /* Main Colors */
+    --primary-green: #27ae60;
+    --primary-green-dark: #1e8449;
+    --primary-green-light: #e8f5e9;
+    
+    --accent-yellow: #f1c40f;
+    --accent-yellow-dark: #d4ac0d;
+    --accent-yellow-light: #fef9e7;
+
+    --accent-orange: #e67e22;
+    --bg-light: #f8fbf9;
+    
+    /* Text & Neutral */
+    --text-dark: #2c3e50;
+    --text-muted: #7f8c8d;
+    --white: #ffffff;
+    --border-color: #dcdde1;
+    
+    /* Shadows & Radius */
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 15px rgba(0,0,0,0.1);
+    --radius-md: 12px;
+    --radius-lg: 20px;
+}
+
+/* Base Styles */
+body {
+    background-color: var(--bg-light);
+    color: var(--text-dark);
+    line-height: 1.6;
+}
+
+h1, h2, h3, .fw-bold {
+    color: var(--text-dark);
+}
+
+/* Card Styling */
+.card {
+    border: none;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    background-color: var(--white);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+/* Form Styling */
+.form-label {
+    color: var(--primary-green-dark);
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+}
+
+.form-control {
+    border: 2px solid #edf0f2;
+    border-radius: 10px;
+    padding: 10px 15px;
+}
+
+.form-control:focus {
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 0.25rem rgba(39, 174, 96, 0.1);
+}
+
+/* Button Styling */
+
+/* Tombol Utama (Hijau) */
+.btn-primary {
+    background-color: var(--primary-green);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-weight: 600;
+    color: var(--white);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-green-dark);
+    transform: translateY(-1px);
+}
+
+/* Tombol Kedua (Kuning) */
+.btn-warning {
+    background-color: var(--accent-yellow);
+    border: none;
+    color: var(--text-dark);
+    font-weight: 600;
+}
+
+.btn-warning:hover {
+    background-color: var(--accent-yellow-dark);
+}
+
+/* Tombol Outline / Batal */
+.btn-outline-secondary {
+    border: 2px solid var(--border-color);
+    color: var(--text-muted);
+    background: transparent;
+    padding: 10px 0;
+    border-radius: 8px;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #f1f2f6;
+    color: var(--text-dark);
+    border-color: var(--text-muted);
+}
+
+/* Tombol Floating / Icon */
+.btn-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--white);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
+    color: var(--primary-green);
+}
+
+/* Table Styling */
+.table {
+    border-collapse: separate;
+    border-spacing: 0 8px;
+}
+
+.table thead th {
+    border: none;
+    color: var(--text-muted);
+    font-weight: 600;
+    padding-bottom: 15px;
+}
+
+.table tbody tr {
+    background-color: var(--white);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+}
+
+.table td {
+    border: none;
+    padding: 15px;
+}
+
+.table tr td:first-child { border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+.table tr td:last-child { border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+
+/* Badge Qty */
+.badge-qty {
+    background-color: var(--accent-yellow-light);
+    color: var(--accent-yellow-dark);
+    padding: 6px 12px;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    border: 1px solid var(--accent-yellow);
+}
+
+.badge-petugas {
+    width: 60%;
+    background-color: var(--primary-green);
+    color: var(--primary-green-light);
+    font-weight: 800;
+    padding: 6px 12px;
+    margin: 5px 0;
+    border-radius: 10px;
+    font-size: 0.85rem;
+}
+
+/* Sidebar / Offcanvas */
+.offcanvas {
+    background-color: var(--bg-light);
+}
+
+.offcanvas-header {
+    background-color: var(--primary-green);
+    color: var(--white);
+}
+
+.offcanvas-title {
+    font-weight: bold;
+}
+
+.group-date-header {
+    background-color: var(--primary-green-light) !important;
+    color: var(--primary-green-dark);
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.btn-delete {
+    color: var(--accent-orange);
+    cursor: pointer;
+    transition: 0.2s;
+    border: none;
+    background: none;
+}
+
+.btn-delete:hover {
+    color: #c0392b;
+    transform: scale(1.2);
+}
+
+/* Container Tabel agar bisa scroll */
+.table-responsive {
+    max-height: 350px; /* Batas tinggi sekitar 5-6 baris */
+    overflow-y: auto;
+    border-radius: 8px;
+}
+
+/* Header tetap di atas saat scroll */
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: white !important;
+    border-bottom: 2px solid #f1f1f1;
+}
+
+/* Jarak antar baris tabel */
+.table td {
+    padding: 12px 8px;
+}
+
+/* Efek mewah scrollbar */
+::-webkit-scrollbar {
+    width: 5px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #27ae60;
+}
+#pills-tab .nav-link {
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+}
+
+#pills-tab .nav-link:hover {
+    background-color: #e9ecef; /* Warna abu muda saat di-hover */
+}
+
+/* Selector spesifik untuk menimpa default Bootstrap */
+.nav-pills .nav-link.active, 
+.nav-pills .show > .nav-link {
+    background-color: #1b4d3e !important; /* Hijau Tua Root */
+    color: #ffffff !important;           /* Teks Putih */
+    box-shadow: 0 4px 12px rgba(27, 77, 62, 0.25); /* Efek bayangan elegan */
+}
+
+/* Opsional: Warna saat tombol ditekan (hover) agar lebih interaktif */
+.nav-pills .nav-link:hover {
+    color: #1b4d3e;
+    background-color: #f1f3f5;
+}
+
+/* --- PENGATURAN CETAK (PRINT) --- */
+@media print {
+    /* 1. Sembunyikan elemen lain (Navigasi, Tombol, dll) */
+    body * { 
+        visibility: hidden; 
+    }
+    
+    /* 2. Tampilkan hanya area surat jalan */
+    #area-cetak, #area-cetak * { 
+        visibility: visible; 
+    }
+    
+    #area-cetak { 
+        position: absolute; 
+        left: 0; 
+        top: 0; 
+        width: 100% !important; 
+        /* Hapus border luar di sini */
+        border: none !important; 
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* 3. Pengaturan Tabel */
+    /* Berikan border HANYA untuk tabel yang memang seharusnya punya garis */
+    table:not(.border-0), 
+    table:not(.border-0) th, 
+    table:not(.border-0) td {
+        border: 1px solid #000 !important;
+    }
+
+    /* Pastikan tabel dengan class border-0 benar-benar bersih */
+    .border-0, .border-0 td, .border-0 th {
+        border: none !important;
+    }
+
+    /* 4. Pengaturan Kertas A5 Landscape */
+    @page { 
+        size: A5 landscape; 
+        margin: 10mm; 
+    }
+
+    /* 5. Bersihkan background */
+    body { 
+        background: white !important; 
+    }
+
+    /* Sembunyikan elemen UI Bootstrap yang mungkin mengganggu */
+    .header-container, .nav-container, .offcanvas, .btn, .no-print {
+        display: none !important;
+    }
+
+    .halaman-surat-jalan {
+        page-break-after: always; /* Memaksa ganti kertas setiap selesai 1 div halaman */
+        border: none !important;
+        margin: 0 !important;
+        padding: 5mm !important;
+    }
+}
+/* Animasi Muncul dari Kanan */
+.fadeInRight {
+    animation: fadeInRight 0.5s ease forwards;
+}
+
+@keyframes fadeInRight {
+    from { opacity: 0; transform: translateX(50px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* Transisi halus untuk penghapusan */
+.alert {
+    transition: opacity 0.5s ease;
+}
+
+#inputShareLink {
+    font-size: 0.85rem;
+    color: #666;
+    cursor: default;
+}
+
+#modalShare .modal-content {
+    background: linear-gradient(to bottom, #ffffff, #fdfdfd);
+}
+
+/* 1. Aturan khusus HP (Mobile) */
+@media (max-width: 767px) {
+    /* Sembunyikan navigasi horizontal bawaan Bootstrap agar tidak double */
+    #pills-tab:not(.flex-column) {
+        display: none !important;
+    }
+
+    /* Pastikan header tetap satu baris (Judul kiri, Menu kanan) */
+    .header-container {
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+    }
+
+    /* Hilangkan padding berlebih */
+    .mb-4 {
+        margin-bottom: 1.5rem !important;
+    }
+}
+
+/* 2. Aturan khusus Desktop (Tablet ke atas) */
+@media (min-width: 768px) {
+    /* Bagian ini tetap simpan jika kamu punya form yang bisa di-collapse */
+    #form-input-container.collapse:not(.show) {
+        display: block !important;
+    }
+    
+    /* Sembunyikan tombol Menu Hamburger di layar besar */
+    [data-bs-target="#offcanvasMenu"] {
+        display: none !important;
+    }
+}
+
+/* 3. Styling Offcanvas agar terlihat premium */
+.offcanvas {
+    border-left: none;
+    box-shadow: -5px 0 25px rgba(0,0,0,0.1);
+}
+
+.offcanvas-body .nav-link.active {
+    background-color: #198754 !important;
+    box-shadow: 0 4px 10px rgba(25, 135, 84, 0.2);
+}
