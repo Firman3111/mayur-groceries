@@ -31,28 +31,36 @@ db.ref("belanja").on("value", (snapshot) => {
     renderSemua(); // Memanggil fungsi render gabungan
 });
 
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('view') === 'karyawan') {
-    // Sembunyikan elemen admin saat dibuka karyawan
-    if(document.getElementById('btnShareAkses')) document.getElementById('btnShareAkses').style.display = 'none';
-    if(document.querySelector('button[onclick="logout()"]')) document.querySelector('button[onclick="logout()"]').style.display = 'none';
-    if(document.getElementById('pills-tab')) document.getElementById('pills-tab').style.display = 'none';
-    
-    // Langsung buka tab Rundown
-    const tabRundown = document.querySelector('[data-bs-target="#tab-rundown"]');
-    if(tabRundown) new bootstrap.Tab(tabRundown).show();
-}
-
-// Set Tanggal Otomatis & Cek Login saat load
 document.addEventListener('DOMContentLoaded', () => {
-    const tglInput = document.getElementById('tglBarang');
-    if(tglInput) tglInput.valueAsDate = new Date();
-    
-    if (sessionStorage.getItem("isLoggedIn") === "true") {
-        const overlay = document.getElementById('loginOverlay');
-        if(overlay) overlay.style.display = "none";
+    const urlParams = new URLSearchParams(window.location.search);
+    const modeView = urlParams.get('view');
+    const overlay = document.getElementById('loginOverlay');
+
+    // PRIORITAS UTAMA: Jika ada mode view, langsung matikan overlay
+    if (modeView === 'customer' || modeView === 'karyawan') {
+        if (overlay) {
+            overlay.style.setProperty('display', 'none', 'important');
+        }
+        
+        // Jalankan proteksi halaman sesuai mode
+        if (modeView === 'customer') {
+            proteksiHalamanCustomer();
+        } else {
+            // Jika ada fungsi untuk karyawan, panggil di sini
+            tampilkanHalamanKaryawan(); 
+        }
+        return; // Berhenti di sini, jangan lanjut ke cek login admin
+    }
+
+    // LOGIKA ADMIN: Jika tidak ada parameter view
+    const statusLogin = sessionStorage.getItem("isLoggedIn");
+    if (statusLogin === "true") {
+        if (overlay) overlay.style.setProperty('display', 'none', 'important');
+    } else {
+        if (overlay) overlay.style.setProperty('display', 'flex', 'important');
     }
 });
+
 
 //------------------------------------------------------------------------- HALAMAN OPERASIONAL ----------------------------------------------------------
 
@@ -971,45 +979,6 @@ db.ref("belanja").on("child_changed", (snapshot) => {
     }
 });
 
-// Variable global untuk link
-let globalShareUrl = "";
-
-function shareKaryawanLink() {
-    // Buat URL dinamis
-    const currentUrl = window.location.origin + window.location.pathname;
-    globalShareUrl = currentUrl + "?view=karyawan";
-    
-    // Masukkan ke input di dalam modal
-    document.getElementById('inputShareLink').value = globalShareUrl;
-    
-    // Tampilkan Modal
-    const myModal = new bootstrap.Modal(document.getElementById('modalShare'));
-    myModal.show();
-}
-
-// Fungsi untuk Salin Teks
-function copyToClipboard() {
-    const copyText = document.getElementById("inputShareLink");
-    navigator.clipboard.writeText(copyText.value).then(() => {
-        // Beri feedback visual pada tombol
-        const btn = event.target;
-        const originalText = btn.innerText;
-        btn.innerText = "Selesai!";
-        btn.classList.replace('btn-success', 'btn-dark');
-        
-        setTimeout(() => {
-            btn.innerText = originalText;
-            btn.classList.replace('btn-dark', 'btn-success');
-        }, 2000);
-    });
-}
-
-// Fungsi Khusus WhatsApp
-function shareViaWA() {
-    const text = encodeURIComponent("Halo, berikut adalah link rundown pekerjaan Mayur Groceries hari ini: " + globalShareUrl);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
-}
-
 //---------------------------------------------------------------------------------------------------------------------------------------------
 
 // --- LOGIKA AUTO-FILL DARI MASTER KE OPERASIONAL ---
@@ -1406,7 +1375,7 @@ function sinkronkanSuratJalan() {
                 
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
                     <div style="flex: 1;">
-                        
+                        <img src="Logo.png" alt="Logo" style="height: 100px; object-fit: contain; margin-bottom: 5px;">
                         <div style="font-size: 11px; line-height: 1.3;">
                             <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
                             Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo
@@ -1649,7 +1618,7 @@ function sinkronkanInvoice() {
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                     <div style="display: flex; align-items: center;">
                         <div>
-                            
+                            <img src="Logo.png" alt="Logo" style="height: 100px; object-fit: contain; margin-bottom: 5px;">
                             <div style="font-size: 11px; line-height: 1.3;">
                                 <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
                                 Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
@@ -1741,91 +1710,6 @@ function copyToClipboardCustomer() {
     });
 }
 
-
-
-// 3. Fungsi Kirim WhatsApp -------------------------------------------------------------------------------------------------------------------------
-function shareViaWACustomer() {
-    const namaCust = document.getElementById('p_cust').innerText || "Pelanggan";
-    const text = encodeURIComponent(`Halo ${namaCust}, berikut adalah link live preview pesanan Mayur Groceries Anda hari ini: ` + globalShareUrlCustomer);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
-}
-
-// Fungsi untuk membatasi tampilan jika diakses sebagai Customer
-function proteksiHalamanCustomer() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const modeView = urlParams.get('view');
-
-    if (modeView === 'customer') {
-        // 1. Sembunyikan Header (Nama App & Tombol Akses/Logout)
-        const header = document.querySelector('.header-container') || document.querySelector('.d-flex.justify-content-between');
-        if (header) header.style.display = 'none';
-
-        // 2. Sembunyikan Navigasi Tab (Pills)
-        const navTab = document.getElementById('pills-tab');
-        if (navTab) navTab.style.display = 'none';
-
-        // 3. Sembunyikan semua konten tab terlebih dahulu
-        const allTabs = document.querySelectorAll('.tab-pane');
-        allTabs.forEach(tab => tab.classList.remove('show', 'active'));
-
-        // 4. Paksa tampilkan hanya Tab View Customer
-        const customerTab = document.getElementById('tab-view-customer');
-        if (customerTab) {
-            customerTab.classList.add('show', 'active');
-        }
-
-        // 5. Tambahkan gaya khusus agar tampilan lebih bersih untuk customer
-        document.body.style.backgroundColor = "#ffffff";
-        
-        // Opsional: Hilangkan padding/margin berlebih yang biasanya untuk admin
-        const container = document.querySelector('.container');
-        if (container) container.classList.remove('mt-4', 'mb-4');
-    }
-}
-
-// Jalankan ini segera setelah halaman dimuat
-document.addEventListener("DOMContentLoaded", function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const modeView = urlParams.get('view');
-
-    // Jika masuk lewat link customer, bypass login
-    if (modeView === 'customer') {
-        sessionStorage.setItem("isLoggedIn", "customer"); // Set status khusus customer
-        document.getElementById('loginOverlay').style.display = "none";
-        proteksiHalamanCustomer(); // Panggil fungsi sembunyikan menu
-    } 
-    // Jika bukan customer, cek apakah admin sudah login sebelumnya
-    // Jika bukan customer, cek apakah admin sudah login sebelumnya
-    else if (sessionStorage.getItem("isLoggedIn") === "true") {
-        const overlay = document.getElementById('loginOverlay');
-        
-        // CEK DULU: Apakah elemennya ada di halaman ini?
-        if (overlay) {
-            overlay.style.display = "none";
-        }
-    }
-});
-
-function cekLogin() {
-    const pin = document.getElementById('pinInput').value;
-    if (pin === "1234") {
-        sessionStorage.setItem("isLoggedIn", "true");
-        document.getElementById('loginOverlay').style.display = "none";
-    } else { 
-        alert("PIN Salah"); 
-    }
-}
-
-// Jalankan fungsi ini setiap kali halaman dimuat
-window.addEventListener('load', proteksiHalamanCustomer);
-
-function logout() {
-    sessionStorage.clear();
-    // Jika logout, buang semua parameter URL dan kembali ke halaman bersih
-    window.location.href = window.location.origin + window.location.pathname;
-}
-
-//--------------------------------------------------------------------------------------------------------------------------------------
 
 // 3. Fungsi SIMPAN ARSIP
 async function arsipTransaksi() {
@@ -2516,3 +2400,136 @@ async function ambilScreenshotSJ() {
 }
 
 
+// Variabel global untuk menampung link
+let urlAksesKaryawan = "";
+
+// 1. Fungsi Utama untuk Membuka Modal
+function shareKaryawanLink() {
+    // Membuat URL otomatis: namafile.html?view=karyawan
+    urlAksesKaryawan = window.location.origin + window.location.pathname + "?view=karyawan";
+    
+    const inputEl = document.getElementById('inputLinkKaryawan');
+    const modalEl = document.getElementById('modalShareKaryawan');
+
+    if (inputEl && modalEl) {
+        inputEl.value = urlAksesKaryawan;
+        
+        // Inisialisasi dan Tampilkan Modal
+        const myModal = new bootstrap.Modal(modalEl);
+        myModal.show();
+    } else {
+        console.error("Elemen modal atau input tidak ditemukan!");
+    }
+}
+
+// 2. Fungsi Copy Link ke Clipboard
+function copyLinkKaryawan(btn) {
+    const input = document.getElementById('inputLinkKaryawan');
+    
+    // Gunakan Clipboard API modern
+    navigator.clipboard.writeText(input.value).then(() => {
+        // Feedback visual sederhana
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Siap!';
+        btn.classList.replace('btn-primary', 'btn-dark');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.classList.replace('btn-dark', 'btn-primary');
+        }, 2000);
+    }).catch(err => {
+        console.error("Gagal menyalin: ", err);
+    });
+}
+
+// 3. Fungsi Kirim WhatsApp
+function shareKeWA() {
+    const pesan = encodeURIComponent("Halo Tim, berikut link rundown pekerjaan Mayur Groceries hari ini: " + urlAksesKaryawan);
+    window.open(`https://wa.me/?text=${pesan}`, '_blank');
+}
+
+// Variabel untuk menampung link customer secara global
+let linkLiveTracking = "";
+
+// 1. Fungsi untuk Membuka Modal
+function bukaShareCustomer() {
+    // Membuat URL lengkap dengan parameter ?view=customer
+    const lokasiHalaman = window.location.origin + window.location.pathname;
+    linkLiveTracking = lokasiHalaman + "?view=customer";
+    
+    // Isi input di modal
+    const inputEl = document.getElementById('inputLinkCustomer');
+    if (inputEl) inputEl.value = linkLiveTracking;
+
+    // Munculkan Modal
+    const modalEl = document.getElementById('modalShareCustomer');
+    const myModal = new bootstrap.Modal(modalEl);
+    myModal.show();
+}
+
+// 2. Fungsi Salin Link (Feedback Visual)
+function copyLinkCustomer(btn) {
+    const input = document.getElementById('inputLinkCustomer');
+    navigator.clipboard.writeText(input.value).then(() => {
+        const iconAsal = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.classList.replace('btn-success', 'btn-dark');
+        
+        setTimeout(() => {
+            btn.innerHTML = iconAsal;
+            btn.classList.replace('btn-dark', 'btn-success');
+        }, 2000);
+    });
+}
+
+// 3. Fungsi Kirim WhatsApp
+function kirimWACustomer() {
+    // Ambil nama pelanggan dari elemen p_cust (jika ada di preview nota)
+    const namaPelanggan = document.getElementById('p_cust')?.innerText || "Pelanggan";
+    
+    const pesan = encodeURIComponent(
+        `Halo Kak ${namaPelanggan}, pesanan Mayur Groceries Anda sedang kami proses. \n\n` +
+        `Pantau status pesanan dan live tracking pengiriman di sini: \n` +
+        linkLiveTracking
+    );
+    
+    window.open(`https://wa.me/?text=${pesan}`, '_blank');
+}
+
+
+function proteksiHalamanCustomer() {
+    // 1. Sembunyikan Navigasi Atas (Pills)
+    const navTab = document.getElementById('pills-tab');
+    if (navTab) navTab.style.setProperty('display', 'none', 'important');
+
+    // 2. Sembunyikan Header Admin secara total (Jika tombol ada di dalam .header-container)
+    const headerAdmin = document.querySelector('.header-container');
+    if (headerAdmin) headerAdmin.style.display = 'none';
+
+    // 3. SEMBUNYIKAN TOMBOL LOGOUT, SHARE, DAN HAMBURGER SECARA SPESIFIK
+    // Kita cari tombol berdasarkan atribut onclick atau class-nya
+    
+    // Sembunyikan Tombol Logout
+    const btnLogout = document.querySelector('button[onclick="logout()"]');
+    if (btnLogout) btnLogout.style.setProperty('display', 'none', 'important');
+
+    // Sembunyikan Tombol Share Customer
+    const btnShareCust = document.querySelector('button[onclick="bukaShareCustomer()"]');
+    if (btnShareCust) btnShareCust.style.setProperty('display', 'none', 'important');
+
+    // Sembunyikan Tombol Hamburger (Menu Mobile)
+    const btnHamburger = document.querySelector('[data-bs-target="#offcanvasMenu"]');
+    if (btnHamburger) btnHamburger.style.setProperty('display', 'none', 'important');
+
+    // 4. Paksa tampilkan Tab Customer
+    const customerTabEl = document.querySelector('#tab-view-customer');
+    if (customerTabEl) {
+        // Hilangkan class active dari tab lain
+        document.querySelectorAll('.tab-pane').forEach(t => t.classList.remove('show', 'active'));
+        // Aktifkan tab customer
+        customerTabEl.classList.add('show', 'active');
+    }
+    
+    // 5. Tambahan: Matikan fungsi klik kanan atau seleksi teks (Opsional agar lebih premium)
+    document.body.style.userSelect = "none";
+}

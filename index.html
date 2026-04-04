@@ -74,7 +74,10 @@
         }
     }
 
-    
+    /* Jika di URL ada ?view=, pastikan loginOverlay tidak bisa muncul sama sekali */
+    body:has([url*="view="]) #loginOverlay {
+        display: none !important;
+    }
     </style>
 
 </head>
@@ -89,19 +92,14 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-danger fw-bold shadow-sm rounded-pill px-3" onclick="logout()">
+                        <i class="fas fa-sign-out-alt me-1"></i> Keluar
+                    </button>
+
                     <button class="btn btn-light border shadow-sm d-lg-none rounded-pill px-3 fw-bold d-flex align-items-center gap-2" 
                             type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasMenu">
                         <span style="font-size: 1.1rem;">☰</span> Menu
                     </button>
-
-                    <div class="d-none d-lg-flex gap-2">
-                        <button onclick="shareKaryawanLink()" class="btn btn-success btn-sm rounded-pill px-3 fw-bold shadow-sm">
-                            🔗 Akses
-                        </button>
-                        <button onclick="logout()" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold">
-                            Keluar
-                        </button>
-                    </div>
                 </div>
             </div>
 
@@ -118,12 +116,15 @@
                     <button class="nav-link rounded-pill py-1 px-3 small fw-bold bg-warning text-dark ms-1" data-bs-toggle="pill" data-bs-target="#tab-view-customer" type="button">👀 Customer</button>
                 </div>
             </div>
+
+            
         </div>
 
         <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasMenu" aria-labelledby="offcanvasMenuLabel">
             <div class="offcanvas-header border-bottom bg-light">
                 <h5 class="offcanvas-title fw-bold" id="offcanvasMenuLabel">Navigasi Mayur</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                
             </div>
             <div class="offcanvas-body">
                 <div class="nav nav-pills flex-column gap-2" role="tablist">
@@ -134,13 +135,10 @@
                     <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-rundown" onclick="tutupMenu()">📋 Rundown</button>
                     <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-penjualan" onclick="tutupMenu()">📄 Surat Jalan</button>
                     <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-invoice" onclick="sinkronkanInvoice(); tutupMenu()">💰 Invoice</button>
-                    <button class="nav-link rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-histori" type="button" onclick="muatDaftarHistori()">📅Histori</button>
+                    <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-invoice" onclick="muatDaftarHistori()">📅Histori</button>
                     <button class="nav-link text-start py-3 shadow-sm bg-warning text-dark border-0" data-bs-toggle="pill" data-bs-target="#tab-view-customer" onclick="tutupMenu()">👀 View Customer</button>
-                    
                     <hr class="my-4">
                     
-                    <button onclick="shareKaryawanLink()" class="btn btn-success w-100 mb-2 py-2 rounded-pill fw-bold">🔗 Bagikan Akses</button>
-                    <button onclick="logout()" class="btn btn-outline-danger w-100 py-2 rounded-pill fw-bold">Keluar Sistem</button>
                 </div>
             </div>
         </div>
@@ -392,6 +390,9 @@
                         <h5 class="fw-bold text-secondary m-0">Rundown Kerja Petugas</h5>
                         <p class="text-muted small m-0">Pantau proses belanja hingga siap kirim</p>
                     </div>
+                    <button class="btn btn-outline-primary fw-bold" onclick="shareKaryawanLink()">
+                        <i class="fas fa-share-alt"></i> Share Link Karyawan
+                    </button>
                 </div>
                 
                 <div id="rundown-container" class="row g-3">
@@ -479,11 +480,11 @@
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                         <div style="display: flex; align-items: center;">
                             <div>
-                                <!--<img src="Logo.png" alt="Logo Mayur" style="height: 85px; object-fit: contain;">-->
+                                <img src="Logo.png" alt="Logo Mayur" style="height: 85px; object-fit: contain;">
                                 <div style="font-size: 11px; line-height: 1.3; margin-top: 5px;">
                                     Mandiri Residence Blok G4 No. 11 <br>
                                     Krian - Sidoarjo<br>
-                                    T. 0858 4347 4469 | wiwitdianasari@gmail.com
+                                    T. 0858 4347 4469
                                 </div>
                             </div>
                         </div>
@@ -530,13 +531,21 @@
 
             <div class="tab-pane fade" id="tab-view-customer" role="tabpanel">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white py-3">
-                        <h5 class="fw-bold mb-0 text-success">Live Order Tracking</h5>
-                        <small class="text-muted">Status progres pesanan customer hari ini</small>
-                        <button onclick="openShareCustomer()" class="btn btn-success btn-sm px-4 rounded-pill fw-bold" style="float: right;">
-                            <i class="fab fa-whatsapp"></i> Bagikan Preview
-                        </button>
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="fw-bold mb-0 text-success">
+                                <i class="fas fa-satellite-dish me-2"></i>Live Order Tracking
+                            </h5>
+                            <small class="text-muted">Status progres pesanan customer hari ini</small>
+                        </div>
+
+                        <div>
+                            <button class="btn btn-success fw-bold shadow-sm rounded-pill px-4" onclick="bukaShareCustomer()">
+                                <i class="fas fa-share-nodes me-2"></i>SHARE LINK
+                            </button>
+                        </div>
                     </div>
+                    
                     <div class="card-body" id="container-view-customer">
                         <div class="order-item-card mb-4 p-3 border rounded shadow-sm">
                             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -585,12 +594,10 @@
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                             <div style="display: flex; align-items: center;">
                                 <div>
-                                    <!--<img src="Logo.png" alt="Logo Mayur" style="height: 85px; object-fit: contain;">-->
-                                    <div style="font-size: 11px; line-height: 1.3; margin-top: 5px;">
-                                    Mandiri Residence Blok G4 No. 11 <br>
-                                    Krian - Sidoarjo<br>
-                                    T. 0858 4347 4469 | wiwitdianasari@gmail.com
-                                </div>
+                                    <img src="Logo.png" alt="Logo Mayur" style="height: 85px; object-fit: contain;">
+                                    <div style="font-size: 11px; line-height: 1.3;">
+                                        Mandiri Residence Blok G4 No. 11 <br> Krian - Sidoarjo
+                                    </div>
                                 </div>
                             </div>
                             <h4 style="margin: 0; font-weight: bold; text-decoration: underline; padding: 20px;">INVOICE (TAGIHAN)</h4>
@@ -715,21 +722,77 @@
     </div>
 
     <div class="modal fade" id="modalEditMaster" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-        <div class="modal-header">
-            <h5 class="modal-title" id="modalTitle">Edit Item</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body" id="modalBodyContent">
+</div>
+
+
+
+<div class="modal fade" id="modalShareKaryawan" tabindex="-1" aria-labelledby="modalShareLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 15px; border: none;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" id="modalShareLabel">Bagikan Rundown</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-        <div class="modal-footer">
-            <button type="button" class="btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="button" class="btn-primary" id="btnSimpanMaster">Simpan Perubahan</button>
-        </div>
+            <div class="modal-body">
+                <p class="text-muted small">Karyawan akan diarahkan ke tampilan khusus rundown tanpa akses admin.</p>
+                
+                <div class="input-group mb-3">
+                    <input type="text" id="inputLinkKaryawan" class="form-control bg-light border-0" readonly style="padding: 12px;">
+                    <button class="btn btn-primary px-3" onclick="copyLinkKaryawan(this)">
+                        <i class="fas fa-copy"></i> Salin
+                    </button>
+                </div>
+
+                <div class="d-grid">
+                    <button class="btn btn-success fw-bold py-2" onclick="shareKeWA()">
+                        <i class="fab fa-whatsapp"></i> Kirim via WhatsApp
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalShareCustomer" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 20px; border: none;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-success">
+                    <i class="fas fa-map-marker-alt me-2"></i>Live Tracking Share
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Kirim link ini agar pelanggan bisa memantau pesanan mereka secara live.</p>
+                
+                <div class="input-group mb-3">
+                    <input type="text" id="inputLinkCustomer" class="form-control bg-light border-0" readonly style="padding: 12px;">
+                    <button class="btn btn-success px-3" onclick="copyLinkCustomer(this)">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+
+                <div class="d-grid">
+                    <button class="btn btn-primary fw-bold py-2" onclick="kirimWACustomer()">
+                        <i class="fab fa-whatsapp me-2"></i>Kirim ke WhatsApp
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div id="loginOverlay" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 10000; align-items: center; justify-content: center;">
+    <div class="text-center p-4 shadow" style="max-width: 350px; width: 90%; border-radius: 20px;">
+        <h4 class="fw-bold mb-3">Mayur Admin</h4>
+        <p class="text-muted small">Masukkan PIN untuk akses penuh</p>
+        <input type="password" id="pinInput" class="form-control form-control-lg text-center mb-3" placeholder="****" style="letter-spacing: 10px;">
+        <button class="btn btn-primary btn-lg w-100 fw-bold" onclick="cekLogin()">MASUK</button>
+    </div>
+</div>
+
+
 
 <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
