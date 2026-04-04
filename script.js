@@ -13,6 +13,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let databaseBelanja = [];
+// Ambil nomor terakhir dari memori browser, jika belum ada (kosong), mulai dari 20
+let simpananCounter = localStorage.getItem('last_counter_sj');
+window.counterSJ = simpananCounter ? parseInt(simpananCounter) : 20;
 
 // 3. AMBIL DATA SECARA REALTIME
 db.ref("belanja").on("value", (snapshot) => {
@@ -121,9 +124,9 @@ function renderTabelHarian(data) {
         if (item.tanggal !== lastDate) {
             html += `
             <tr>
-                <td colspan="4" class="fw-bold small ps-3 py-2" 
-                    style="background-color: #e7e7e7 !important; color: #3f524a !important; letter-spacing: 1px;">
-                    <i class="bi bi-calendar3"></i> 📅 JADWAL BELANJA: ${item.tanggal}
+                <td colspan="5" class="fw-bold small ps-3 py-2" 
+                    style="background-color: #f8f9fa !important; color: #3f524a !important; font-size: 0.75rem;">
+                    <i class="bi bi-calendar3"></i> JADWAL: ${item.tanggal}
                 </td>
             </tr>`;
             lastDate = item.tanggal;
@@ -131,31 +134,88 @@ function renderTabelHarian(data) {
 
         const total = (item.harga || 0) * (item.jumlah || 0);
         const beratBersih = item.qtyBersih ? item.qtyBersih.toFixed(2) : item.jumlah;
+        const isSelesai = item.statusAlur === "Sudah Dikirim";
+        const isSiap = item.step3 === true || item.step3 === "true";
+        
+        const styleKolom = isSelesai ? 'background-color: #d1e7dd !important;' : '';
+        const styleKolomTengah = isSelesai ? 'background-color: #d1e7dd !important;' : 'background-color: #fef9e7;';
+
+        // STATUS: Pakai Icon di HP, Teks di Laptop
+        let statusHtml = `
+            <div class="d-none d-md-block">
+                ${isSelesai ? '<span class="badge bg-success p-2"><i class="bi bi-check-all"></i> DIKIRIM</span>' : 
+                 isSiap ? '<span class="badge bg-warning text-dark p-2">SIAP</span>' : 
+                 '<span class="badge bg-secondary p-2">PROSES</span>'}
+            </div>
+            <div class="d-md-none" style="font-size: 1.2rem;">
+                ${isSelesai ? '✅' : isSiap ? '📦' : '⏳'}
+            </div>
+        `;
 
         html += `
             <tr class="border-bottom">
-                <td class="ps-3 py-3" style="width: 40%;">
-                    <div class="fw-bold text-dark" style="font-size: 1.1rem; line-height: 1.2;">${item.nama}</div>
-                    <div class="badge-petugas">👤 PETUGAS: ${item.petugas.toUpperCase()}</div>
-                    <div class="text-muted small mt-1" style="font-size: 0.7rem;">Rasio: ${item.rasio || 1}</div>
+                <td class="ps-3 py-2" style="width: 35%; ${styleKolom}">
+                    <div class="fw-bold text-dark lh-sm" style="font-size: clamp(0.85rem, 2vw, 1.1rem);">${item.nama}</div>
+                    <div class="text-muted d-none d-sm-block" style="font-size: 0.7rem;">👤 ${item.petugas.toUpperCase()}</div>
                 </td>
-                <td class="text-center py-3" style="width: 20%; background-color: #fef9e7;">
-                    <div class="fw-bold text-success" style="font-size: 1.6rem;">${item.jumlah} <small class="text-muted" style="font-size: 0.6rem;">Ktr</small></div>
-                    <div class="badge bg-white text-dark border small" style="font-size: 0.6rem;">Net: ${beratBersih} kg</div>
+
+                <td class="text-center py-2" style="width: 20%; ${styleKolomTengah}">
+                    <div class="fw-bold ${isSelesai ? 'text-dark' : 'text-success'}" style="font-size: clamp(1.1rem, 3vw, 1.5rem);">${item.jumlah}</div>
+                    <div class="text-muted border-top border-secondary" style="font-size: 0.8rem;">${beratBersih} kg</div>
                 </td>
-                <td class="text-end py-3 pe-3" style="width: 25%;">
-                    <div class="fw-bold text-success">Rp ${total.toLocaleString('id-ID')}</div>
-                    <div class="text-muted" style="font-size: 0.7rem;">@Rp ${item.harga.toLocaleString('id-ID')}</div>
+
+                <td class="text-end py-2 pe-3" style="width: 20%; ${styleKolom}">
+                    <div class="fw-bold" style="font-size: clamp(0.8rem, 2vw, 1rem);">Rp ${total.toLocaleString('id-ID')}</div>
+                    <div class="text-muted d-none d-sm-block" style="font-size: 0.65rem;">@${item.harga.toLocaleString('id-ID')}</div>
                 </td>
-                <td class="text-center py-3" style="width: 15%;">
-                    <button onclick="hapusItem('${item.id}')" class="btn btn-sm btn-outline-danger border-0">✕</button>
+
+                <td class="text-center py-2" style="width: 10%; ${styleKolom}">
+                    ${statusHtml}
+                </td>
+
+                <td class="text-center py-2 pe-2" style="width: 15%; ${styleKolom}">
+                    <div class="btn-group shadow-sm bg-white p-1 border rounded">
+                        <button onclick="bukaModalHarga('${item.id}', '${item.nama}', ${item.harga_pokok || item.harga}, ${item.markup || 0})" 
+                                class="btn btn-sm btn-light border-0 p-1 px-sm-2">✏️</button>
+                        <button onclick="hapusItem('${item.id}')" class="btn btn-sm btn-outline-danger border-0 p-1 px-sm-2 d-none d-sm-inline-block">✕</button>
+                        <div class="d-flex align-items-center px-1 px-sm-2 border-start ms-1">
+                            <input type="checkbox" class="form-check-input check-item m-0" value="${item.id}" onchange="updateTampilanTombolHapus()" style="width: 1.2rem; height: 1.2rem;">
+                        </div>
+                    </div>
                 </td>
             </tr>`;
     });
-    container.innerHTML = html || '<tr><td colspan="4" class="text-center py-5 text-muted">Belum ada jadwal.</td></tr>';
+    container.innerHTML = html || '<tr><td colspan="5" class="text-center py-5">Belum ada jadwal.</td></tr>';
 }
 
-// Panggil fungsi ini agar dropdown barang di Operasional terisi
+
+// 1. Variabel Global di paling atas
+const tglHariIni = new Date().toISOString().split('T')[0];
+
+// 2. Fungsi Ambil Data Belanja Hari Ini (Modifikasi Baru)
+function inisialisasiDataHarian() {
+    // KITA HAPUS .equalTo(tglHariIni) agar Admin bisa melihat SEMUA jadwal
+    db.ref("belanja")
+      .orderByChild("tanggal")
+      .limitToLast(100) // Ambil 100 transaksi terakhir agar tidak berat
+      .on("value", (snapshot) => {
+          const data = [];
+          snapshot.forEach((child) => {
+              data.push(child.val());
+          });
+          
+          // Simpan ke variabel global
+          window.databaseBelanjaHarian = data; 
+          
+          // Tampilkan di Tabel Jadwal (Admin melihat SEMUA)
+          renderTabelHarian(data);
+          
+          // Tampilkan di Rundown (Fungsi Rundown nanti yang akan memfilter "Hari Ini")
+          renderRundown(data);
+      });
+}
+
+// 3. Fungsi Isi Dropdown Barang (Tetap Diperlukan)
 function loadMasterKeOperasional() {
     const select = document.getElementById('selectBarangOperasional');
     if(!select) return;
@@ -170,10 +230,16 @@ function loadMasterKeOperasional() {
     });
 }
 
-// Jalankan saat window load
-window.addEventListener('load', loadMasterKeOperasional);
-// Tambahkan di bagian paling bawah script.js atau di dalam window.onload
-sinkronkanDropdownKategori();
+// 4. Jalankan Keduanya saat Halaman Dibuka
+window.addEventListener('load', () => {
+    loadMasterKeOperasional(); // Isi dropdown dulu
+    inisialisasiDataHarian();   // Baru tarik data belanja hari ini
+    
+    // Set default tanggal di form input ke hari ini
+    if(document.getElementById('tglBarang')) {
+        document.getElementById('tglBarang').value = tglHariIni;
+    }
+});
 
 //------------------------------------------------------------------------- HALAMAN MASTER ----------------------------------------------------------
 
@@ -594,16 +660,35 @@ function renderRundown(dataArr) {
     const container = document.getElementById('rundown-container');
     if (!container || !dataArr) return;
 
-    // Filter data bukan biaya
-    const dataBarang = dataArr.filter(item => !item.nama.includes("[BIAYA]"));
-    
-    // Grouping berdasarkan petugas
-    const grouped = dataBarang.reduce((acc, item) => {
-        if (!acc[item.petugas]) acc[item.petugas] = [];
-        acc[item.petugas].push(item);
-        return acc;
-    }, {});
+    // 1. FILTER: Hanya barang hari ini yang BELUM dikirim
+    const dataAktif = dataArr.filter(item => 
+        !item.nama.includes("[BIAYA]") && 
+        item.tanggal === tglHariIni && 
+        item.statusAlur !== "Sudah Dikirim"
+    );
 
+    // 2. GROUPING: Pastikan menggunakan {} sebagai initial value di akhir reduce
+    const grouped = dataAktif.reduce((acc, item) => {
+        const namaPetugas = item.petugas || "Tanpa Nama";
+        if (!acc[namaPetugas]) {
+            acc[namaPetugas] = []; // Inisialisasi sebagai array kosong
+        }
+        acc[namaPetugas].push(item);
+        return acc;
+    }, {}); // <--- PENTING: Objek kosong ini harus ada agar tidak error
+
+    // Jika data kosong setelah difilter
+    if (Object.keys(grouped).length === 0) {
+        container.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <h1 class="display-1">✅</h1>
+                <h4 class="text-muted mt-3">Rundown Bersih</h4>
+                <p>Tidak ada tugas aktif untuk hari ini (${tglHariIni}).</p>
+            </div>`;
+        return;
+    }
+
+    // 3. RENDER HTML (Gunakan Object.keys untuk looping)
     let html = `
         <div class="col-12 mb-3 d-lg-none">
             <select class="form-select rounded-pill border-success shadow-sm" onchange="filterPetugas(this.value)">
@@ -615,8 +700,9 @@ function renderRundown(dataArr) {
 
     Object.keys(grouped).forEach((petugas, index) => {
         const idCollapse = `collapse-${petugas.replace(/\s+/g, '')}`;
-        const totalTugas = grouped[petugas].length;
-        const tugasSelesai = grouped[petugas].filter(item => item.step3).length;
+        const daftarTugas = grouped[petugas]; // Ini sekarang pasti Array
+        const totalTugas = daftarTugas.length;
+        const tugasSelesai = daftarTugas.filter(item => item.step3 === true).length;
 
         html += `
         <div class="col-md-6 col-lg-4 mb-3 card-petugas" data-nama="${petugas}">
@@ -627,13 +713,12 @@ function renderRundown(dataArr) {
                      data-bs-target="#${idCollapse}">
                     <div>
                         <h6 class="m-0 fw-bold text-success">👤 ${petugas.toUpperCase()}</h6>
-                        <small class="text-muted">${tugasSelesai}/${totalTugas} Tugas Selesai</small>
+                        <small class="text-muted">${tugasSelesai}/${totalTugas} Tugas Aktif</small>
                     </div>
                     <span class="badge rounded-pill ${tugasSelesai === totalTugas ? 'bg-success' : 'bg-warning text-dark'}">
                         ${tugasSelesai === totalTugas ? '✓' : '●'}
                     </span>
                 </div>
-
                 <div class="collapse ${index === 0 ? 'show' : ''}" id="${idCollapse}">
                     <div class="list-group list-group-flush border-top">`;
 
@@ -851,6 +936,10 @@ const notifSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2
 // Monitor perubahan pada tabel 'belanja'
 db.ref("belanja").on("child_changed", (snapshot) => {
     const item = snapshot.val();
+
+    // HANYA beri notifikasi jika item tersebut adalah transaksi HARI INI
+    if (item.tanggal !== tglHariIni) return;
+
     const urlParams = new URLSearchParams(window.location.search);
     
     // Notifikasi HANYA muncul di layar Admin (yang tidak ada ?view=karyawan)
@@ -920,6 +1009,8 @@ function shareViaWA() {
     const text = encodeURIComponent("Halo, berikut adalah link rundown pekerjaan Mayur Groceries hari ini: " + globalShareUrl);
     window.open(`https://wa.me/?text=${text}`, '_blank');
 }
+
+//---------------------------------------------------------------------------------------------------------------------------------------------
 
 // --- LOGIKA AUTO-FILL DARI MASTER KE OPERASIONAL ---
 
@@ -1043,6 +1134,22 @@ db.ref("belanja").on("value", (snapshot) => {
     sinkronkanSuratJalan(); // Update Tabel Surat Jalan
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Variable sementara untuk menampung item yang akan diprint
 let keranjangKirim = [];
 
@@ -1083,42 +1190,67 @@ function tambahItemKirim() {
 }
 
 function renderPreviewSuratJalan() {
-    const noSJ = document.getElementById('noSuratJalan').value || "-";
-    const customer = document.getElementById('namaCustomer').value || "-";
-    const alamat = document.getElementById('alamatCustomer').value || "-";
+    // 1. Ambil info header dari input form
+    const noSJ = document.getElementById('noSuratJalan')?.value || "-";
+    const customer = document.getElementById('namaCustomer')?.value || "-";
+    const alamat = document.getElementById('alamatCustomer')?.value || "-";
     
-    // Format Tanggal: Sidoarjo, 03 April 2026
+    // Format Tanggal: Sidoarjo, 04 April 2026
     const options = { day: '2-digit', month: 'long', year: 'numeric' };
     const tglFormatted = "Sidoarjo, " + new Date().toLocaleDateString('id-ID', options);
 
-    document.getElementById('p_noSJ').innerText = noSJ;
-    document.getElementById('p_tgl').innerText = tglFormatted;
-    document.getElementById('p_cust').innerText = customer;
-    document.getElementById('p_alamat').innerText = alamat;
+    // Update Teks di Elemen Preview (elemen yang akan di-print)
+    if(document.getElementById('p_noSJ')) document.getElementById('p_noSJ').innerText = noSJ;
+    if(document.getElementById('p_tgl')) document.getElementById('p_tgl').innerText = tglFormatted;
+    if(document.getElementById('p_cust')) document.getElementById('p_cust').innerText = customer;
+    if(document.getElementById('p_alamat')) document.getElementById('p_alamat').innerText = alamat;
     
+    // 2. FILTER DATA: Ambil hanya yang SIAP tapi BELUM berstatus "Sudah Dikirim"
+    // Pastikan window.databaseBelanjaHarian sudah terisi dari Firebase
+    const itemsSiapCetak = (window.databaseBelanjaHarian || []).filter(item => 
+        item.tanggal === tglHariIni && 
+        item.step3 === true && 
+        item.statusAlur !== "Sudah Dikirim"
+    );
+
     const tbody = document.getElementById('listKirim');
+    if (!tbody) return;
+
     let html = '';
     
-    // Loop item di keranjang
-    keranjangKirim.forEach((item, index) => {
+    // 3. Render Item yang lolos filter ke dalam tabel
+    itemsSiapCetak.forEach((item, index) => {
+        // Gunakan qtyBersih untuk berat netto yang akurat
+        const berat = item.qtyBersih ? Number(item.qtyBersih).toFixed(2) : "0.00";
+        
         html += `
             <tr>
-                <td class="text-center border-dark">${index + 1}</td>
+                <td class="text-center border-dark" style="width: 50px;">${index + 1}</td>
                 <td class="border-dark fw-bold">${item.nama}</td>
-                <td class="text-center border-dark fw-bold">${item.qty.toFixed(2)}</td>
-                <td class="text-center border-dark">kg</td>
+                <td class="text-center border-dark fw-bold" style="width: 100px;">${berat}</td>
+                <td class="text-center border-dark" style="width: 60px;">kg</td>
             </tr>`;
     });
 
-    // Menambahkan baris kosong agar tabel tetap terlihat proporsional (min 5 baris)
+    // 4. Logika Baris Kosong (Min 6 Baris) agar Surat Jalan terlihat profesional
     const minBaris = 6;
-    if (keranjangKirim.length < minBaris) {
-        for (let i = keranjangKirim.length; i < minBaris; i++) {
-            html += `<tr><td class="border-dark text-white">${i+1}</td><td class="border-dark"></td><td class="border-dark"></td><td class="border-dark"></td></tr>`;
+    if (itemsSiapCetak.length < minBaris) {
+        for (let i = itemsSiapCetak.length; i < minBaris; i++) {
+            html += `
+                <tr>
+                    <td class="border-dark text-white text-center">${i + 1}</td>
+                    <td class="border-dark">&nbsp;</td>
+                    <td class="border-dark">&nbsp;</td>
+                    <td class="border-dark">&nbsp;</td>
+                </tr>`;
         }
     }
     
     tbody.innerHTML = html;
+
+    // 5. Kunci Sinkronisasi: Update variabel global untuk proses 'Cetak & Potong Stok'
+    // Jika list kosong, maka tombol Cetak di fungsi sebelah akan memberikan alert "Tidak ada barang"
+    window.itemsAkanDicetak = itemsSiapCetak;
 }
 
 // Mengisi dropdown pilih barang di tab Penjualan secara otomatis
@@ -1199,86 +1331,110 @@ function generateSuratJalanDariRundown() {
     });
 }
 
-//Split SURAT JALAN TIAP 5 ITEM
-
 function sinkronkanSuratJalan() {
     const containerUtama = document.getElementById('area-cetak'); 
     if (!containerUtama) return;
 
-    // 1. Ambil data yang sudah SIAP (Step 3)
     const itemsSiap = databaseBelanja.filter(item => item.step3 === true);
     
     if (itemsSiap.length === 0) {
-        containerUtama.innerHTML = '<div class="text-center py-5 text-muted">Belum ada barang yang berstatus SIAP.</div>';
+        containerUtama.innerHTML = '<div class="text-center py-5 text-muted no-print">Belum ada barang yang berstatus SIAP.</div>';
         return;
     }
 
-    // 2. Ambil data header dari input agar sinkron
-    const noSJ = document.getElementById('sj_nomor')?.value || "......";
-    const namaCust = document.getElementById('p_cust')?.innerText || "-";
-    const alamatCust = document.getElementById('p_alamat')?.innerHTML || "-";
-    const tglTeks = document.getElementById('p_lokasi_tgl')?.innerText || "";
+    // 1. Ambil data header
+    const noSJRaw = document.getElementById('sj_nomor')?.value || "";
+    const tglInput = document.getElementById('sj_tanggal')?.value;
+    const alamatFull = document.getElementById('sj_alamat')?.value || "";
 
-    // 3. Pecah array menjadi kelompok (chunk) berisi maksimal 5 item
+    const prefixMG = noSJRaw.substring(0, 5); 
+    let angkaUrutMulai = parseInt(noSJRaw.substring(5)) || 0;
+
+    let tglTeks = "-";
+    if (tglInput) {
+        const d = new Date(tglInput);
+        const daftarBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+        tglTeks = `SIDOARJO, ${d.getDate()} ${daftarBulan[d.getMonth()]} ${d.getFullYear()}`;
+    }
+
+    let namaCust = "-";
+    let alamatCust = "-";
+    if (alamatFull) {
+        const baris = alamatFull.split('\n'); 
+        namaCust = baris[0].toUpperCase();
+        alamatCust = baris.length > 1 ? baris.slice(1).join('<br>') : "-";
+    }
+
     const perHalaman = 5;
     const kumpulanHalaman = [];
     for (let i = 0; i < itemsSiap.length; i += perHalaman) {
         kumpulanHalaman.push(itemsSiap.slice(i, i + perHalaman));
     }
 
-    // 4. Bersihkan area cetak dan render ulang per lembar
+    // 2. Reset container (Bersihkan tampilan agar tidak menumpuk)
     containerUtama.innerHTML = ''; 
+    containerUtama.style.background = 'transparent';
+    containerUtama.style.border = 'none';
+    containerUtama.style.padding = '0';
 
     kumpulanHalaman.forEach((halamanItems, index) => {
         const hlmKe = index + 1;
         const totalHlm = kumpulanHalaman.length;
+        const noSJFinal = prefixMG + (angkaUrutMulai + index).toString().padStart(2, '0');
 
         let rowsHtml = '';
         halamanItems.forEach((item, idx) => {
             const noUrut = (index * perHalaman) + (idx + 1);
             rowsHtml += `
                 <tr>
-                    <td style="border: 1px solid #000; padding: 10px; text-align: center;">${noUrut}</td>
-                    <td style="border: 1px solid #000; padding: 10px; text-transform: uppercase;">${item.nama}</td>
-                    <td style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">
+                    <td style="border: 1px solid #000; padding: 8px; text-align: center;">${noUrut}</td>
+                    <td style="border: 1px solid #000; padding: 8px 12px; text-transform: uppercase;">${item.nama}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">
                         ${item.qtyBersih ? item.qtyBersih.toFixed(2) : (item.jumlah || 0)} KG
                     </td>
                 </tr>`;
         });
 
-        // Tambahkan baris kosong jika item < 5 agar tinggi tabel seragam (opsional)
+        // Baris kosong penyeimbang
         for (let i = halamanItems.length; i < perHalaman; i++) {
-            rowsHtml += `<tr><td style="border: 1px solid #000; padding: 15px;">&nbsp;</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
+            rowsHtml += `<tr><td style="border: 1px solid #000; padding: 18px;">&nbsp;</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
         }
 
-        // Render satu lembar Surat Jalan
+        // 3. Render Struktur (Gaya yang sama dengan Invoice)
         containerUtama.innerHTML += `
-            <div class="halaman-surat-jalan" style="${index > 0 ? 'page-break-before: always; margin-top: 30px;' : ''} background: white; color: black; font-family: Arial, sans-serif;">
+            <div class="halaman-surat-jalan-print" style="${index > 0 ? 'page-break-before: always;' : ''} width: 100%; color: #000; font-family: Arial, sans-serif; background: white; padding: 25px;">
+                
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                    <div style="display: flex; align-items: center;">
-                        <img src="Logo.png" alt="Logo" style="height: 75px; margin-right: 15px; object-fit: contain;">
+                    <div style="flex: 1;">
+                        
                         <div style="font-size: 11px; line-height: 1.3;">
-                            <strong>MAYUR GROCERIES</strong><br>
-                            Mandiri Residence Blok G4 No. 11<br>
-                            Krian - Sidoarjo | 0858 4347 4469
+                            <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
+                            Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo
+                            wiwitdianasari@gmail.com | 0858 4347 4469
                         </div>
                     </div>
-                    <div style="text-align: center;">
-                        <h4 style="margin: 0; font-weight: bold; text-decoration: underline;">SURAT JALAN</h4>
-                        <small style="font-size: 10px;">Halaman ${hlmKe} dari ${totalHlm}</small>
+
+                    <div style="flex: 1; text-align: center; padding-top: 10px;">
+                        <h3 style="margin: 0; font-weight: bold; text-decoration: underline; font-size: 20px; letter-spacing: 2px;">SURAT JALAN</h3>
+                        <small style="font-size: 11px;">Halaman ${hlmKe} dari ${totalHlm}</small>
                     </div>
-                    <div style="text-align: left; font-size: 12px;">
-                        <div style="font-size: 16px; font-weight: bold; padding: 5px; border: 2px solid #000; margin-bottom: 5px;">
-                            NO: ${noSJ}
+
+                    <div style="flex: 1; display: flex; justify-content: flex-end;">
+                        <div style="text-align: left; min-width: 200px;">
+                            <div style="font-size: 16px; font-weight: bold; padding: 8px; border: 2.5px solid #000; margin-bottom: 10px; text-align: center;">
+                                NO. MG: ${noSJFinal}
+                            </div>
+                            <div style="font-weight: bold; font-size: 13px;">${tglTeks}</div>
+                            <div style="font-size: 13px; margin-top: 5px;">
+                                <strong>Kepada Yth.</strong><br>
+                                <span style="text-transform: uppercase; font-weight: bold;">${namaCust}</span><br>
+                                <div style="line-height: 1.2;">${alamatCust}</div>
+                            </div>
                         </div>
-                        <span style="font-size: 11px;">${tglTeks}</span><br>
-                        <strong>Kepada Yth.</strong><br>
-                        <span style="text-transform: uppercase; font-weight: bold;">${namaCust}</span><br>
-                        <div style="max-width: 250px; line-height: 1.2;">${alamatCust}</div>
                     </div>
                 </div>
 
-                <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 13px;">
+                <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 13px; margin-top: 30px;">
                     <thead>
                         <tr style="text-align: center; background-color: #f2f2f2;">
                             <th style="border: 1px solid #000; padding: 10px; width: 50px;">NO</th>
@@ -1286,22 +1442,21 @@ function sinkronkanSuratJalan() {
                             <th style="border: 1px solid #000; padding: 10px; width: 150px;">JUMLAH</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${rowsHtml}
-                    </tbody>
+                    <tbody>${rowsHtml}</tbody>
                 </table>
 
-                <table style="width: 100%; margin-top: 40px; text-align: center; font-size: 12px; border: none;" class="border-0">
+                <table style="width: 100%; margin-top: 50px; text-align: center; font-size: 13px; border: none !important;">
                     <tr>
-                        <td class="border-0" style="width: 33%;">Dibuat Oleh,<br><br><br><br>( <strong>Firman Agung</strong> )</td>
-                        <td class="border-0" style="width: 33%;">Diperiksa Oleh,<br><br><br><br>( <strong>Wiwit Diana Sari</strong> )</td>
-                        <td class="border-0" style="width: 33%;">Penerima,<br><br><br><br>( .......................... )</td>
+                        <td style="border: none !important; width: 33%;">Dibuat Oleh,<br><br><br><br>( <strong>Firman Agung</strong> )</td>
+                        <td style="border: none !important; width: 33%;">Diperiksa Oleh,<br><br><br><br>( <strong>Wiwit Diana Sari</strong> )</td>
+                        <td style="border: none !important; width: 33%;">Penerima,<br><br><br><br>( .......................... )</td>
                     </tr>
                 </table>
-                
-                <hr class="no-print" style="border-top: 1px dashed #ccc; margin: 40px 0;">
-            </div>`;
-    });
+
+                <hr style="border-top: 1px dashed #ccc; margin: 30px 0;" class="no-print">
+            </div>`;});
+
+    
 }
 
 // FUNGSI UNTUK UPDATE TAMPILAN SURAT JALAN SECARA REAL-TIME
@@ -1349,25 +1504,24 @@ function updatePreviewSJ() {
     }
 }
 
-// FUNGSI INISIALISASI (Dijalankan saat halaman pertama kali dibuka)
+// 1. FUNGSI INISIALISASI (Dijalankan saat halaman pertama kali dibuka)
 function inisialisasiSJ() {
     const inputTgl = document.getElementById('sj_tanggal');
     const inputNo = document.getElementById('sj_nomor');
 
-    // Set tanggal otomatis ke hari ini
-    if (inputTgl) {
+    // Set tanggal otomatis ke hari ini (Hanya sekali saat buka)
+    if (inputTgl && !inputTgl.value) {
         const today = new Date().toISOString().split('T')[0];
         inputTgl.value = today;
     }
 
-    // Buat nomor surat jalan otomatis berdasarkan waktu (unik)
+    // Nomor SJ dikosongkan/dibuat statis agar tidak acak (Hapus Date.now)
     if (inputNo && !inputNo.value) {
-        const code = Date.now().toString().slice(-6);
-        inputNo.value = "MG-" + code;
+        inputNo.value = "0142615"; // Nilai awal contoh
     }
     
-    // Jalankan preview agar template tidak kosong saat pertama buka
-    updatePreviewSJ();
+    // Langsung sinkronkan tampilan
+    sinkronkanSuratJalan();
 }
 
 // Pastikan inisialisasi jalan saat aplikasi siap
@@ -1426,7 +1580,14 @@ function sinkronkanInvoice() {
 
     // 1. Ambil data dasar dari input
     const noSJ = document.getElementById('sj_nomor')?.value || "-";
-    const tglTeks = document.getElementById('p_lokasi_tgl')?.innerText || "SIDOARJO, -";
+    // PERBAIKAN DI SINI: Ambil dari input tanggal seperti di Surat Jalan
+    const tglInput = document.getElementById('sj_tanggal')?.value;
+    let tglTeks = "SIDOARJO, -";
+    if (tglInput) {
+        const d = new Date(tglInput);
+        const daftarBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+        tglTeks = `SIDOARJO, ${d.getDate()} ${daftarBulan[d.getMonth()]} ${d.getFullYear()}`;
+    }
     const namaCust = document.getElementById('p_cust')?.innerText || "-";
     const alamatCust = document.getElementById('p_alamat')?.innerHTML || "-";
 
@@ -1483,28 +1644,30 @@ function sinkronkanInvoice() {
 
         // Render struktur HTML asli kamu
         containerUtama.innerHTML += `
-            <div class="halaman-invoice-print" style="${index > 0 ? 'page-break-before: always; margin-top: 20px;' : ''} width: 100%; color: #000; font-family: 'Arial', sans-serif; box-sizing: border-box;">
+            <div class="halaman-invoice-print" style="${index > 0 ? 'page-break-before: always; margin-top: 20px;' : ''} width: 100%; color: #000; font-family: 'Arial', sans-serif; box-sizing: border-box; padding: 20px;">
                 
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                     <div style="display: flex; align-items: center;">
                         <div>
-                            <img src="Logo.png" alt="Logo Mayur" style="height: 85px; object-fit: contain;">
+                            
                             <div style="font-size: 11px; line-height: 1.3;">
-                                Mandiri Residence Blok G4 No. 11 <br> Krian - Sidoarjo
+                                <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
+                                Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
+                                wiwitdianasari@gmail.com | 0858 4347 4469
                             </div>
                         </div>
                     </div>
-                    <h4 style="margin: 0; font-weight: bold; text-decoration: underline; padding: 20px;">INVOICE (TAGIHAN)</h4>
+                    <h4 style="margin: -150; font-weight: bold; text-decoration: underline; padding: 24px;">INVOICE</h4>
                     <div style="text-align: left;">
                         <div style="font-size: 16px; margin-top: 5px; font-weight: 600; padding: 8px; border: 2px solid #000;">
                             INV. MG: <span>${noSJ}</span> 
                         </div>
-                        <span>${tglTeks}</span>
-                        <div>
-                            <strong>Kepada Yth.</strong><br>
-                            <div style="font-weight: bold; text-transform: uppercase;">${namaCust}</div>
-                            <div style="max-width: 300px; line-height: 1.2;">${alamatCust}</div>
-                        </div>
+                        <div style="font-weight: bold; font-size: 13px; margin-top: 15px;">${tglTeks}</div>
+                        <div style="font-size: 13px; margin-top: 5px;">
+                                <strong>Kepada Yth.</strong><br>
+                                <span style="text-transform: uppercase; font-weight: bold;">${namaCust}</span><br>
+                                <div style="line-height: 1.2;">${alamatCust}</div>
+                            </div>
                     </div>
                 </div>
 
@@ -1632,8 +1795,14 @@ document.addEventListener("DOMContentLoaded", function() {
         proteksiHalamanCustomer(); // Panggil fungsi sembunyikan menu
     } 
     // Jika bukan customer, cek apakah admin sudah login sebelumnya
+    // Jika bukan customer, cek apakah admin sudah login sebelumnya
     else if (sessionStorage.getItem("isLoggedIn") === "true") {
-        document.getElementById('loginOverlay').style.display = "none";
+        const overlay = document.getElementById('loginOverlay');
+        
+        // CEK DULU: Apakah elemennya ada di halaman ini?
+        if (overlay) {
+            overlay.style.display = "none";
+        }
     }
 });
 
@@ -1711,3 +1880,639 @@ async function arsipTransaksi() {
         alert("Gagal menyimpan transaksi ke database.");
     }
 }
+
+//-------------------------------------------------------------------------------------------------------------------------------------
+
+//Fungsi EDIT HARGA DI OPERASIONAL
+function updateHargaMaster(itemId, hargaPokok, markup) {
+    const hp = parseFloat(hargaPokok) || 0;
+    const mu = parseFloat(markup) || 0;
+    const hargaJual = hp + mu;
+
+    db.ref(`master_items/${itemId}`).update({
+        harga_pokok: hp,
+        markup: mu,
+        harga: hargaJual
+    }).then(() => {
+        console.log("Harga master diperbarui!");
+        // Kamu bisa tambah toast/alert kecil di sini
+    });
+}
+
+function bukaModalHarga(id, nama, hp, mu) {
+    // 1. Set Judul
+    document.getElementById('modalTitle').innerText = `Update Harga: ${nama}`;
+    
+    // 2. Isi Konten Modal
+    document.getElementById('modalBodyContent').innerHTML = `
+        <div class="mb-3">
+            <label class="form-label fw-bold">Harga Pokok (Beli) - Rp</label>
+            <input type="number" id="edit_hp" class="form-control" value="${hp}" oninput="hitungEstJual()">
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold text-primary">Markup / Profit - Rp</label>
+            <input type="number" id="edit_mu" class="form-control" value="${mu}" oninput="hitungEstJual()">
+        </div>
+        <div class="p-3 bg-light border rounded">
+            <small class="text-muted d-block">Harga Jual Baru:</small>
+            <h4 class="text-success mb-0" id="est_jual_display">Rp ${(parseFloat(hp) + parseFloat(mu)).toLocaleString('id-ID')}</h4>
+        </div>
+    `;
+
+    // Fungsi lokal untuk update angka di modal secara live
+    window.hitungEstJual = function() {
+        const h = parseFloat(document.getElementById('edit_hp').value) || 0;
+        const m = parseFloat(document.getElementById('edit_mu').value) || 0;
+        document.getElementById('est_jual_display').innerText = `Rp ${(h + m).toLocaleString('id-ID')}`;
+    };
+
+    // 3. Munculkan Modal
+    const modalEl = document.getElementById('modalEditMaster');
+    const myModal = new bootstrap.Modal(modalEl);
+    myModal.show();
+
+    // 4. Aksi Tombol Simpan
+    document.getElementById('btnSimpanMaster').onclick = async function() {
+        const newHp = parseFloat(document.getElementById('edit_hp').value) || 0;
+        const newMu = parseFloat(document.getElementById('edit_mu').value) || 0;
+        const newHargaJual = newHp + newMu;
+
+        try {
+            // Update di tabel transaksi (belanja) agar invoice langsung berubah
+            await db.ref(`belanja/${id}`).update({
+                harga_pokok: newHp,
+                markup: newMu,
+                harga: newHargaJual
+            });
+            
+            myModal.hide();
+            // Opsional: Jika ingin update ke Master Item juga agar besok harga ini jadi default
+            // updateKeMaster(nama, newHp, newMu, newHargaJual); 
+        } catch (error) {
+            alert("Gagal update harga: " + error.message);
+        }
+    };
+}
+
+//FUNGSI POTONG STOCK
+async function prosesCetakDanPotongStok() {
+    // 1. Filter data dari memori browser
+    const itemsSiap = window.databaseBelanjaHarian.filter(item => 
+        item.tanggal === tglHariIni && 
+        item.step3 === true && 
+        item.statusAlur !== "Sudah Dikirim"
+    );
+
+    if (itemsSiap.length === 0) {
+        return alert("Tidak ada barang baru yang siap kirim untuk hari ini.");
+    }
+
+    // --- LOGIKA PENOMORAN HARDCODE MG 01426 [COUNTER] ---
+    const kodeTetap = "01426"; 
+    const urutanFormat = window.counterSJ.toString().padStart(2, '0'); // Pastikan 2 digit (20, 21, dst)
+    
+    // Hasil: MG 01426 20
+    const noSJ = `MG ${kodeTetap} ${urutanFormat}`;
+    
+    // Simpan nomor urut berikutnya ke memori agar tidak reset saat F5
+    window.counterSJ++; 
+    localStorage.setItem('last_counter_sj', window.counterSJ);
+
+    try {
+        const updates = {};
+        const timestamp = Date.now();
+        const idPengiriman = "SEND_" + timestamp;
+        const d = new Date();
+        const waktuSkrg = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
+
+        for (const item of itemsSiap) {
+            if (!item.idMaster || item.idMaster === "-") {
+                console.warn(`Skipping ${item.nama}: ID Master Kosong`);
+                continue;
+            }
+
+            const masterPath = `master_items/${item.idMaster}`;
+            const snapshot = await db.ref(masterPath).get();
+
+            if (snapshot.exists()) {
+                const dataMaster = snapshot.val();
+                const stokSekarang = Number(dataMaster.stok_tersedia || 0);
+                const qtyKeluar = Number(item.qtyBersih || 0);
+                const stokBaru = stokSekarang - qtyKeluar;
+
+                // A. Update Stok di Gudang Master
+                updates[`${masterPath}/stok_tersedia`] = stokBaru;
+                
+                // B. Update Status di Database Belanja
+                updates[`belanja/${item.id}/statusAlur`] = "Sudah Dikirim"; 
+                updates[`belanja/${item.id}/stokSudahDipotong`] = true;
+                updates[`belanja/${item.id}/noSJ`] = noSJ;
+                updates[`belanja/${item.id}/idPengiriman`] = idPengiriman;
+
+                // C. Catat Detail ke History (Items)
+                updates[`history_pengiriman/${idPengiriman}/items/${item.id}`] = {
+                    nama: item.nama,
+                    qty: qtyKeluar,
+                    idMaster: item.idMaster,
+                    idBelanja: item.id
+                };
+
+                // Update Memori Lokal
+                const idx = window.databaseBelanjaHarian.findIndex(d => d.id === item.id);
+                if (idx !== -1) {
+                    window.databaseBelanjaHarian[idx].statusAlur = "Sudah Dikirim";
+                }
+            }
+        }
+
+        // D. Catat Header History dengan Nomor SJ yang sudah di-generate
+        updates[`history_pengiriman/${idPengiriman}/header`] = {
+            no_surat_jalan: noSJ,
+            tanggal_kirim: tglHariIni,
+            waktu_proses: waktuSkrg,
+            total_item: itemsSiap.length
+        };
+
+        // EKSEKUSI KE FIREBASE
+        await db.ref().update(updates);
+        
+        alert(`Berhasil! Stok dipotong & SJ ${noSJ} tersimpan.`);
+        
+        // 2. RE-RENDER & PRINT
+        if (typeof renderPreviewSuratJalan === "function") {
+            renderPreviewSuratJalan();
+        }
+        
+        setTimeout(() => { window.print(); }, 800);
+
+    } catch (error) {
+        console.error("Gagal Update Firebase:", error);
+        alert("Terjadi kesalahan sistem. Cek Console F12.");
+    }
+}
+
+
+// 1. Fungsi Pilih Semua / Uncheck Semua
+function togglePilihSemua(source) {
+    const checkboxes = document.querySelectorAll('.check-item');
+    checkboxes.forEach(cb => {
+        cb.checked = source.checked;
+    });
+    updateTampilanTombolHapus();
+}
+
+// 2. Fungsi untuk memantau centang (panggil ini di renderTabelHarian)
+// Tambahkan onchange="updateTampilanTombolHapus()" pada checkbox di dalam renderTabelHarian
+function updateTampilanTombolHapus() {
+    const terpilih = document.querySelectorAll('.check-item:checked').length;
+    const btnHapus = document.getElementById('btnHapusBanyak');
+    const badgeCount = document.getElementById('countSelected');
+
+    if (terpilih > 0) {
+        btnHapus.classList.remove('d-none');
+        badgeCount.classList.remove('d-none');
+        badgeCount.innerText = `${terpilih} item terpilih`;
+    } else {
+        btnHapus.classList.add('d-none');
+        badgeCount.classList.add('d-none');
+    }
+}
+
+// 3. Fungsi Eksekusi Hapus Banyak
+async function hapusBanyakItem() {
+    const terpilih = document.querySelectorAll('.check-item:checked');
+    
+    if (terpilih.length === 0) return;
+
+    if (confirm(`Hapus permanen ${terpilih.length} item yang dipilih dari jadwal?`)) {
+        try {
+            const updates = {};
+            terpilih.forEach(cb => {
+                const id = cb.value;
+                updates[`belanja/${id}`] = null;
+            });
+
+            await db.ref().update(updates);
+            
+            // Reset kontrol setelah hapus
+            document.getElementById('selectAll').checked = false;
+            updateTampilanTombolHapus();
+            
+            alert("Item berhasil dihapus!");
+        } catch (error) {
+            console.error(error);
+            alert("Gagal menghapus beberapa item.");
+        }
+    }
+}
+
+// Simpan status halaman histori dalam satu objek agar aman
+window.HistoriApp = {
+    mode: 'SJ',       // Default: Surat Jalan
+    idTerpilih: null  // Menyimpan ID (Key Firebase) yang sedang dibuka
+};
+
+function setHistoriMode(mode) {
+    console.log("🔄 Mengubah Mode ke:", mode);
+    window.HistoriApp.mode = mode;
+
+    // Ambil elemen tombol secara spesifik
+    const btnSJ = document.getElementById('btn-mode-sj');
+    const btnINV = document.getElementById('btn-mode-inv');
+
+    if (mode === 'SJ') {
+        // Nyalakan tombol SJ, matikan INV
+        btnSJ.classList.replace('btn-light', 'btn-success');
+        btnINV.classList.replace('btn-success', 'btn-light');
+    } else {
+        // Nyalakan tombol INV, matikan SJ
+        btnINV.classList.replace('btn-light', 'btn-success');
+        btnSJ.classList.replace('btn-success', 'btn-light');
+    }
+
+    // Jika user sudah memilih satu nota, langsung refresh tampilannya
+    if (window.HistoriApp.idTerpilih) {
+        renderPreviewHistori(window.HistoriApp.idTerpilih);
+    }
+}
+
+function muatDaftarHistori() {
+    const listArea = document.getElementById('listHistori');
+    if (!listArea) return;
+
+    // Ambil data dari path: history_pengiriman
+    db.ref('history_pengiriman').limitToLast(50).on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (!data) {
+            listArea.innerHTML = '<div class="text-center py-5 text-muted small">Belum ada data pengiriman.</div>';
+            return;
+        }
+
+        let html = '';
+        // Balik urutan agar yang terbaru (timestamp besar) ada di atas
+        const sortedKeys = Object.keys(data).reverse();
+
+        sortedKeys.forEach(key => {
+            const h = data[key].header;
+            const items = data[key].items || {};
+            const jmlItem = Object.keys(items).length;
+
+            html += `
+                <button onclick="renderPreviewHistori('${key}')" 
+                        class="list-group-item list-group-item-action border-0 rounded-3 mb-2 shadow-sm py-2 px-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold text-success small">${h.no_surat_jalan}</div>
+                            <div class="text-dark fw-bold" style="font-size: 0.75rem;">PELANGGAN UMUM</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="badge bg-light text-muted border" style="font-size: 0.6rem;">${h.tanggal_kirim}</div>
+                            <div class="text-muted d-block" style="font-size: 0.65rem;">${jmlItem} Barang</div>
+                        </div>
+                    </div>
+                </button>`;
+        });
+        listArea.innerHTML = html;
+    });
+}
+
+async function renderPreviewHistori(id) {
+    // 1. Simpan ID agar saat ganti mode (SJ/INV) tetap konsisten
+    window.HistoriApp.idTerpilih = id; 
+    
+    const area = document.getElementById('area-preview-histori');
+    const titleLabel = document.getElementById('previewTitle');
+
+    if (!area) return;
+
+    // 2. SAPU BERSIH: Pastikan area benar-benar kosong sebelum render baru
+    area.innerHTML = ''; 
+    
+    // Tampilkan loading sebentar di dalam area yang sudah kosong
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = "text-center py-5 text-muted small";
+    loadingDiv.innerHTML = '<div class="spinner-border spinner-border-sm mb-2"></div><br>Sinkronisasi data...';
+    area.appendChild(loadingDiv);
+
+    try {
+        const snapshot = await db.ref(`history_pengiriman/${id}`).once('value');
+        const fullData = snapshot.val();
+        
+        if (!fullData) {
+            area.innerHTML = '<div class="p-5 text-center">Data tidak ditemukan.</div>';
+            return;
+        }
+
+        // 3. Update Judul Header
+        if (titleLabel) titleLabel.innerText = `DOKUMEN: ${fullData.header.no_surat_jalan}`;
+
+        // 4. BERSIHKAN LAGI: Hapus loading sebelum memasukkan template asli
+        area.innerHTML = ''; 
+
+        // 5. Eksekusi Render berdasarkan MODE yang aktif
+        if (window.HistoriApp.mode === 'SJ') {
+            renderUlangSuratJalan(fullData, area);
+        } else {
+            renderUlangInvoice(fullData, area);
+        }
+
+    } catch (err) {
+        console.error("Gagal render:", err);
+        area.innerHTML = '<div class="alert alert-danger m-3">Gagal memuat dokumen.</div>';
+    }
+}
+
+function filterHistori() {
+    const keyword = document.getElementById('historiSearch').value.toLowerCase();
+    const dateVal = document.getElementById('historiDate').value; // format yyyy-mm-dd
+    const buttons = document.querySelectorAll('#listHistori button');
+
+    buttons.forEach(btn => {
+        const text = btn.innerText.toLowerCase();
+        const matchText = text.includes(keyword);
+        const matchDate = !dateVal || text.includes(dateVal);
+
+        if (matchText && matchDate) {
+            btn.classList.remove('d-none');
+        } else {
+            btn.classList.add('d-none');
+        }
+    });
+}
+
+function renderUlangSuratJalan(data, container) {
+    const header = data.header || {};
+    const itemsRaw = data.items || {};
+    const itemsSiap = Object.values(itemsRaw);
+
+    // --- LOGIKA PENOMORAN IDENTIK ---
+    let noSJFinal = header.no_surat_jalan || "";
+    // Jika formatnya masih timestamp (panjang), kita rapikan
+    if (noSJFinal.length > 12) {
+        const cleanNumber = noSJFinal.replace('SJ-', '');
+        noSJFinal = 'MG-' + cleanNumber.substring(cleanNumber.length - 5);
+    } else {
+        // Ganti prefix SJ menjadi MG agar seragam dengan layout baru
+        noSJFinal = noSJFinal.replace('SJ-', 'MG-').replace('SJ', 'MG');
+    }
+
+    // --- LOGIKA TANGGAL ---
+    let tglTeks = "-";
+    if (header.tanggal_kirim) {
+        const d = new Date(header.tanggal_kirim);
+        const daftarBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+        tglTeks = `SIDOARJO, ${d.getDate()} ${daftarBulan[d.getMonth()]} ${d.getFullYear()}`;
+    }
+
+    // --- LOGIKA PAGING (5 baris per halaman) ---
+    const perHalaman = 5;
+    const kumpulanHalaman = [];
+    for (let i = 0; i < itemsSiap.length; i += perHalaman) {
+        kumpulanHalaman.push(itemsSiap.slice(i, i + perHalaman));
+    }
+
+    // Reset Container
+    container.innerHTML = '';
+    
+    kumpulanHalaman.forEach((halamanItems, index) => {
+        const hlmKe = index + 1;
+        const totalHlm = kumpulanHalaman.length;
+
+        let rowsHtml = '';
+        halamanItems.forEach((item, idx) => {
+            const noUrut = (index * perHalaman) + (idx + 1);
+            rowsHtml += `
+                <tr>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: center;">${noUrut}</td>
+                    <td style="border: 1px solid #000; padding: 8px 12px; text-transform: uppercase;">${item.nama}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">
+                        ${item.qty || 0} KG
+                    </td>
+                </tr>`;
+        });
+
+        // Baris kosong penyeimbang (agar tinggi tabel konsisten)
+        for (let i = halamanItems.length; i < perHalaman; i++) {
+            rowsHtml += `<tr><td style="border: 1px solid #000; padding: 18px;">&nbsp;</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
+        }
+
+        // RENDER LAYOUT IDENTIK
+        container.innerHTML += `
+            <div class="halaman-surat-jalan-print" style="${index > 0 ? 'page-break-before: always;' : ''} width: 100%; color: #000; font-family: Arial, sans-serif; background: white; padding: 25px; box-sizing: border-box;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                    <div style="flex: 1;">
+                        <img src="Logo.png" alt="Logo" style="height: 100px; object-fit: contain; margin-bottom: 5px;">
+                        <div style="font-size: 11px; line-height: 1.3;">
+                            <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
+                            Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
+                            wiwitdianasari@gmail.com | 0858 4347 4469
+                        </div>
+                    </div>
+
+                    <div style="flex: 1; text-align: center; padding-top: 10px;">
+                        <h3 style="margin: 0; font-weight: bold; text-decoration: underline; font-size: 20px; letter-spacing: 2px;">SURAT JALAN</h3>
+                        <small style="font-size: 11px;">Halaman ${hlmKe} dari ${totalHlm}</small>
+                    </div>
+
+                    <div style="flex: 1; display: flex; justify-content: flex-end;">
+                        <div style="text-align: left; min-width: 200px;">
+                            <div style="font-size: 16px; font-weight: bold; padding: 8px; border: 2.5px solid #000; margin-bottom: 10px; text-align: center;">
+                                NO. MG: ${noSJFinal}
+                            </div>
+                            <div style="font-weight: bold; font-size: 13px;">${tglTeks}</div>
+                            <div style="font-size: 13px; margin-top: 5px;">
+                                <strong>Kepada Yth.</strong><br>
+                                <span style="text-transform: uppercase; font-weight: bold;">PELANGGAN UMUM</span><br>
+                                <div style="line-height: 1.2;">SIDOARJO / SURABAYA</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 13px; margin-top: 30px;">
+                    <thead>
+                        <tr style="text-align: center; background-color: #f2f2f2;">
+                            <th style="border: 1px solid #000; padding: 10px; width: 50px;">NO</th>
+                            <th style="border: 1px solid #000; padding: 10px;">JENIS PESANAN</th>
+                            <th style="border: 1px solid #000; padding: 10px; width: 150px;">JUMLAH</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+
+                <table style="width: 100%; margin-top: 50px; text-align: center; font-size: 13px; border: none !important;">
+                    <tr>
+                        <td style="border: none !important; width: 33%;">Dibuat Oleh,<br><br><br><br>( <strong>Firman Agung</strong> )</td>
+                        <td style="border: none !important; width: 33%;">Diperiksa Oleh,<br><br><br><br>( <strong>Wiwit Diana Sari</strong> )</td>
+                        <td style="border: none !important; width: 33%;">Penerima,<br><br><br><br>( .......................... )</td>
+                    </tr>
+                </table>
+            </div>`;
+    });
+}
+
+// Jalankan otomatis saat halaman selesai loading
+document.addEventListener('DOMContentLoaded', () => {
+    // Beri jeda 1 detik agar Firebase siap
+    setTimeout(() => {
+        if (typeof muatDaftarHistori === "function") {
+            console.log("🚀 Memulai muat histori...");
+            muatDaftarHistori();
+        }
+    }, 1000);
+});
+
+function cetakHistoriSJ() {
+    // 1. Ambil konten HTML yang sudah di-render oleh JS kamu
+    const kontenSJ = document.getElementById('area-preview-histori').innerHTML;
+
+    // Cek apakah data sudah dipilih
+    if (kontenSJ.includes("Pilih data") || kontenSJ.trim() === "") {
+        alert("Silakan pilih data histori terlebih dahulu!");
+        return;
+    }
+
+    // 2. Buka jendela baru (Pop-up)
+    const printWindow = window.open('', '_blank', 'width=900,height=600');
+
+    // 3. Masukkan HTML Lengkap ke jendela baru
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Cetak Surat Jalan - Mayur Groceries</title>
+            <style>
+                /* Reset Dasar */
+                body { margin: 0; padding: 0; background: #fff; }
+                
+                /* Pengaturan Kertas A5 Landscape */
+                @page { 
+                    size: A5 landscape; 
+                    margin: 0; 
+                }
+
+                /* CSS Tambahan agar tampilan sama persis dengan render kamu */
+                .halaman-surat-jalan-print {
+                    width: 100%;
+                    height: 100%;
+                    padding: 20px;
+                    box-sizing: border-box;
+                    page-break-after: always;
+                }
+
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border: 1px solid #000 !important; }
+                
+                /* Pastikan tabel tanda tangan tidak punya border */
+                table[style*="border: none"] td, 
+                table[style*="border: none !important"] td {
+                    border: none !important;
+                }
+
+                /* Paksa Gambar Muncul */
+                img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            </style>
+        </head>
+        <body>
+            ${kontenSJ}
+            <script>
+                // Tunggu konten (termasuk gambar logo) selesai dimuat
+                window.onload = function() {
+                    window.print();
+                    // Menutup jendela otomatis setelah print selesai atau dibatalkan
+                    window.onafterprint = function() {
+                        window.close();
+                    };
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+}
+
+async function shareGambar(idElemen, judulFile) {
+    const elemen = document.getElementById(idElemen);
+    if (!elemen) return alert("Elemen tidak ditemukan!");
+
+    try {
+        // 1. Ambil "Foto" dari elemen HTML
+        const canvas = await html2canvas(elemen, {
+            scale: 2, // Biar gambar tajam/HD
+            useCORS: true, // Biar logo muncul
+            backgroundColor: "#ffffff"
+        });
+
+        // 2. Ubah jadi Blob (Data Gambar)
+        canvas.toBlob(async (blob) => {
+            const file = new File([blob], `${judulFile}.png`, { type: 'image/png' });
+
+            // 3. Cek apakah Browser mendukung fitur Share (Biasanya di HP)
+            if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: judulFile,
+                    text: `Berikut adalah ${judulFile} dari Mayur Groceries.`
+                });
+            } else {
+                // 4. Jika di Laptop/PC (Tidak bisa share langsung), maka otomatis Download
+                const link = document.createElement('a');
+                link.download = `${judulFile}.png`;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                alert("Gambar telah diunduh. Silakan lampirkan manual ke WhatsApp.");
+            }
+        }, 'image/png');
+    } catch (err) {
+        console.error("Gagal share gambar:", err);
+        alert("Terjadi kesalahan saat memproses gambar.");
+    }
+}
+
+
+async function ambilScreenshotSJ() {
+    const areaCetak = document.getElementById('area-cetak');
+    if (!areaCetak) return alert("Area Surat Jalan tidak ditemukan!");
+
+    // Tampilkan loading sederhana (opsional)
+    const tombolAsal = event.target;
+    const teksAsal = tombolAsal.innerHTML;
+    tombolAsal.innerHTML = "📸 Memproses...";
+    tombolAsal.disabled = true;
+
+    try {
+        // Ambil screenshot menggunakan html2canvas
+        const canvas = await html2canvas(areaCetak, {
+            scale: 3, // Skala tinggi agar gambar sangat tajam (High Definition)
+            useCORS: true, // Pastikan logo muncul
+            backgroundColor: "#ffffff", // Latar belakang putih bersih
+            // Mengabaikan elemen dengan class 'no-print' agar tidak ikut terfoto
+            ignoreElements: (node) => {
+                return node.classList.contains('no-print');
+            }
+        });
+
+        // Ubah hasil capture menjadi data gambar
+        const imgData = canvas.toDataURL("image/png");
+
+        // Proses Download atau Share
+        const link = document.createElement('a');
+        const tgl = new Date().toISOString().slice(0, 10);
+        link.download = `SJ_Mayur_${tgl}.png`;
+        link.href = imgData;
+        link.click();
+
+        alert("Screenshot Surat Jalan berhasil diunduh!");
+    } catch (err) {
+        console.error("Gagal mengambil screenshot:", err);
+        alert("Gagal mengambil gambar. Pastikan library html2canvas sudah terpasang.");
+    } finally {
+        // Kembalikan tombol ke status semula
+        tombolAsal.innerHTML = teksAsal;
+        tombolAsal.disabled = false;
+    }
+}
+
+

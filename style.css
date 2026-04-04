@@ -270,64 +270,54 @@ h1, h2, h3, .fw-bold {
 }
 
 /* --- PENGATURAN CETAK (PRINT) --- */
+/* --- PENGATURAN CETAK (PRINT) --- */
 @media print {
-    /* 1. Sembunyikan elemen lain (Navigasi, Tombol, dll) */
+    /* 1. Sembunyikan elemen lain */
     body * { 
         visibility: hidden; 
     }
     
-    /* 2. Tampilkan hanya area surat jalan */
-    #area-cetak, #area-cetak * { 
-        visibility: visible; 
+    /* 2. Tampilkan area cetak BARU DAN area cetak HISTORI */
+    #area-cetak, #area-cetak *, 
+    #area-preview-histori, #area-preview-histori * { 
+        visibility: visible !important; 
     }
     
-    #area-cetak { 
+    /* Atur posisi keduanya agar nempel ke pojok kertas A5 */
+    #area-cetak, #area-preview-histori { 
         position: absolute; 
         left: 0; 
         top: 0; 
         width: 100% !important; 
-        /* Hapus border luar di sini */
         border: none !important; 
         padding: 0 !important;
         margin: 0 !important;
     }
 
-    /* 3. Pengaturan Tabel */
-    /* Berikan border HANYA untuk tabel yang memang seharusnya punya garis */
+    /* --- Sisa kode poin 3, 4, dan 5 tetap sama seperti milik Anda --- */
+    
     table:not(.border-0), 
     table:not(.border-0) th, 
     table:not(.border-0) td {
         border: 1px solid #000 !important;
     }
 
-    /* Pastikan tabel dengan class border-0 benar-benar bersih */
     .border-0, .border-0 td, .border-0 th {
         border: none !important;
     }
 
-    /* 4. Pengaturan Kertas A5 Landscape */
     @page { 
         size: A5 landscape; 
         margin: 10mm; 
     }
 
-    /* 5. Bersihkan background */
-    body { 
-        background: white !important; 
-    }
-
-    /* Sembunyikan elemen UI Bootstrap yang mungkin mengganggu */
-    .header-container, .nav-container, .offcanvas, .btn, .no-print {
+    /* Pastikan elemen UI benar-benar hilang */
+    .header-container, .nav-container, .offcanvas, .btn, .no-print, .modal-header, .sidebar {
         display: none !important;
     }
-
-    .halaman-surat-jalan {
-        page-break-after: always; /* Memaksa ganti kertas setiap selesai 1 div halaman */
-        border: none !important;
-        margin: 0 !important;
-        padding: 5mm !important;
-    }
 }
+
+
 /* Animasi Muncul dari Kanan */
 .fadeInRight {
     animation: fadeInRight 0.5s ease forwards;
