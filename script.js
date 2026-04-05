@@ -1411,7 +1411,7 @@ function sinkronkanSuratJalan() {
                     <div style="flex: 1;">
                         
                         <div style="font-size: 11px; line-height: 1.3;">
-                            <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
+                            <strong style="font-size: 14px;"></strong><br>
                             Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo
                             wiwitdianasari@gmail.com | 0858 4347 4469
                         </div>
@@ -1654,7 +1654,7 @@ function sinkronkanInvoice() {
                         <div>
                             
                             <div style="font-size: 11px; line-height: 1.3;">
-                                <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
+                                <strong style="font-size: 14px;"></strong><br>
                                 Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
                                 wiwitdianasari@gmail.com | 0858 4347 4469
                             </div>
