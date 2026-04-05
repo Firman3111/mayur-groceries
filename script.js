@@ -1409,7 +1409,7 @@ function sinkronkanSuratJalan() {
                 
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
                     <div style="flex: 1;">
-                        <img src="Logo.png" alt="Logo" style="height: 100px; object-fit: contain; margin-bottom: 5px;">
+                        
                         <div style="font-size: 11px; line-height: 1.3;">
                             <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
                             Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo
@@ -1652,7 +1652,7 @@ function sinkronkanInvoice() {
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                     <div style="display: flex; align-items: center;">
                         <div>
-                            <img src="Logo.png" alt="Logo" style="height: 100px; object-fit: contain; margin-bottom: 5px;">
+                            
                             <div style="font-size: 11px; line-height: 1.3;">
                                 <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
                                 Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
