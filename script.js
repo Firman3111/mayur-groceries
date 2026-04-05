@@ -29,6 +29,8 @@ db.ref("belanja").on("value", (snapshot) => {
         databaseBelanja = [];
     }
     renderSemua(); // Memanggil fungsi render gabungan
+    // TAMBAHKAN INI DI AKHIR:
+    inisialisasiModeTampilan();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -668,22 +670,26 @@ function renderRundown(dataArr) {
     const container = document.getElementById('rundown-container');
     if (!container || !dataArr) return;
 
-    // 1. FILTER: Hanya barang hari ini yang BELUM dikirim
+    // --- MODIFIKASI: Ambil tanggal dari input filter agar tidak kaku ---
+    const filterInput = document.getElementById('filterTglRundown');
+    const tglTarget = filterInput ? filterInput.value : tglHariIni;
+
+    // 1. FILTER: Gunakan tglTarget agar rundown mengikuti pilihan kalender
     const dataAktif = dataArr.filter(item => 
         !item.nama.includes("[BIAYA]") && 
-        item.tanggal === tglHariIni && 
+        item.tanggal === tglTarget && // Menggunakan tglTarget
         item.statusAlur !== "Sudah Dikirim"
     );
 
-    // 2. GROUPING: Pastikan menggunakan {} sebagai initial value di akhir reduce
+    // 2. GROUPING: (Tetap menggunakan logika reduce Anda yang sudah aman)
     const grouped = dataAktif.reduce((acc, item) => {
         const namaPetugas = item.petugas || "Tanpa Nama";
         if (!acc[namaPetugas]) {
-            acc[namaPetugas] = []; // Inisialisasi sebagai array kosong
+            acc[namaPetugas] = []; 
         }
         acc[namaPetugas].push(item);
         return acc;
-    }, {}); // <--- PENTING: Objek kosong ini harus ada agar tidak error
+    }, {}); 
 
     // Jika data kosong setelah difilter
     if (Object.keys(grouped).length === 0) {
@@ -691,12 +697,12 @@ function renderRundown(dataArr) {
             <div class="col-12 text-center py-5">
                 <h1 class="display-1">✅</h1>
                 <h4 class="text-muted mt-3">Rundown Bersih</h4>
-                <p>Tidak ada tugas aktif untuk hari ini (${tglHariIni}).</p>
+                <p>Tidak ada tugas aktif untuk tanggal ${tglTarget}.</p>
             </div>`;
         return;
     }
 
-    // 3. RENDER HTML (Gunakan Object.keys untuk looping)
+    // 3. RENDER HTML (Lanjutkan dengan kode UI Anda yang sudah keren)
     let html = `
         <div class="col-12 mb-3 d-lg-none">
             <select class="form-select rounded-pill border-success shadow-sm" onchange="filterPetugas(this.value)">
@@ -708,7 +714,7 @@ function renderRundown(dataArr) {
 
     Object.keys(grouped).forEach((petugas, index) => {
         const idCollapse = `collapse-${petugas.replace(/\s+/g, '')}`;
-        const daftarTugas = grouped[petugas]; // Ini sekarang pasti Array
+        const daftarTugas = grouped[petugas];
         const totalTugas = daftarTugas.length;
         const tugasSelesai = daftarTugas.filter(item => item.step3 === true).length;
 
@@ -721,7 +727,7 @@ function renderRundown(dataArr) {
                      data-bs-target="#${idCollapse}">
                     <div>
                         <h6 class="m-0 fw-bold text-success">👤 ${petugas.toUpperCase()}</h6>
-                        <small class="text-muted">${tugasSelesai}/${totalTugas} Tugas Aktif</small>
+                        <small class="text-muted">${tugasSelesai}/${totalTugas} Selesai</small>
                     </div>
                     <span class="badge rounded-pill ${tugasSelesai === totalTugas ? 'bg-success' : 'bg-warning text-dark'}">
                         ${tugasSelesai === totalTugas ? '✓' : '●'}
@@ -730,14 +736,14 @@ function renderRundown(dataArr) {
                 <div class="collapse ${index === 0 ? 'show' : ''}" id="${idCollapse}">
                     <div class="list-group list-group-flush border-top">`;
 
-        grouped[petugas].forEach(item => {
+        daftarTugas.forEach(item => {
             const qcDone = item.qcKualitas && item.qcBerat && item.qcPacking;
             const isBelanja = item.step1;
             const isProses = item.step2;
             const isSiap = item.step3;
 
             let bgColor = "#ffffff";
-            if (isSiap) bgColor = "#f1f3f5"; // Abu-abu sangat muda untuk yang selesai
+            if (isSiap) bgColor = "#f1f3f5"; 
             else if (isProses) bgColor = "#fff9db";
             else if (isBelanja) bgColor = "#f8f9fa";
 
@@ -811,6 +817,34 @@ function updateQC(itemId, key, val) {
     updateData[key] = val;
     db.ref("belanja/" + itemId).update(updateData);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const filterTgl = document.getElementById('filterTglRundown');
+    
+    if (filterTgl) {
+        // 1. Set default ke tanggal hari ini (agar sinkron dengan sistem)
+        const today = new Date().toISOString().split('T')[0];
+        filterTgl.value = today;
+
+        // 2. Pasang Event Listener (Cukup di sini saja)
+        filterTgl.addEventListener('change', () => {
+            // Pastikan databaseBelanja sudah terisi dari Firebase
+            renderRundown(databaseBelanja);
+        });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Listener untuk menampilkan Tabel Inventori
 // LISTENER OTOMATIS: Jalan setiap ada perubahan di Firebase
@@ -2453,18 +2487,23 @@ let linkLiveTracking = "";
 
 // 1. Fungsi untuk Membuka Modal
 function bukaShareCustomer() {
-    // Membuat URL lengkap dengan parameter ?view=customer
+    // Membuat URL lengkap
     const lokasiHalaman = window.location.origin + window.location.pathname;
+    
+    // Pastikan menggunakan parameter ?view=customer
     linkLiveTracking = lokasiHalaman + "?view=customer";
     
-    // Isi input di modal
     const inputEl = document.getElementById('inputLinkCustomer');
-    if (inputEl) inputEl.value = linkLiveTracking;
+    if (inputEl) {
+        inputEl.value = linkLiveTracking;
+    }
 
-    // Munculkan Modal
+    // Munculkan Modal (Gunakan cara Bootstrap 5 yang benar)
     const modalEl = document.getElementById('modalShareCustomer');
-    const myModal = new bootstrap.Modal(modalEl);
-    myModal.show();
+    if (modalEl) {
+        const myModal = new bootstrap.Modal(modalEl);
+        myModal.show();
+    }
 }
 
 // 2. Fungsi Salin Link (Feedback Visual)
@@ -2502,26 +2541,11 @@ function proteksiHalamanCustomer() {
     const navTab = document.getElementById('pills-tab');
     if (navTab) navTab.style.setProperty('display', 'none', 'important');
 
-    // 2. Sembunyikan Header Admin secara total (Jika tombol ada di dalam .header-container)
+    // 2. Sembunyikan Header Admin (Opsional, agar bersih)
     const headerAdmin = document.querySelector('.header-container');
     if (headerAdmin) headerAdmin.style.display = 'none';
 
-    // 3. SEMBUNYIKAN TOMBOL LOGOUT, SHARE, DAN HAMBURGER SECARA SPESIFIK
-    // Kita cari tombol berdasarkan atribut onclick atau class-nya
-    
-    // Sembunyikan Tombol Logout
-    const btnLogout = document.querySelector('button[onclick="logout()"]');
-    if (btnLogout) btnLogout.style.setProperty('display', 'none', 'important');
-
-    // Sembunyikan Tombol Share Customer
-    const btnShareCust = document.querySelector('button[onclick="bukaShareCustomer()"]');
-    if (btnShareCust) btnShareCust.style.setProperty('display', 'none', 'important');
-
-    // Sembunyikan Tombol Hamburger (Menu Mobile)
-    const btnHamburger = document.querySelector('[data-bs-target="#offcanvasMenu"]');
-    if (btnHamburger) btnHamburger.style.setProperty('display', 'none', 'important');
-
-    // 4. Paksa tampilkan Tab Customer
+    // 3. Paksa tampilkan Tab Customer
     const customerTabEl = document.querySelector('#tab-view-customer');
     if (customerTabEl) {
         // Hilangkan class active dari tab lain
@@ -2529,7 +2553,41 @@ function proteksiHalamanCustomer() {
         // Aktifkan tab customer
         customerTabEl.classList.add('show', 'active');
     }
-    
-    // 5. Tambahan: Matikan fungsi klik kanan atau seleksi teks (Opsional agar lebih premium)
-    document.body.style.userSelect = "none";
+}
+
+
+function inisialisasiModeTampilan() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const view = urlParams.get('view');
+
+    if (view === 'customer') {
+        console.log("Mode Customer Terdeteksi!");
+
+        // 1. Sembunyikan Overlay Login (PENTING: Agar customer tidak diminta PIN)
+        const loginOverlay = document.getElementById('loginOverlay');
+        if (loginOverlay) loginOverlay.style.display = 'none';
+
+        // 2. Sembunyikan Navigasi Tab Admin (pills-tab)
+        const navAdmin = document.getElementById('pills-tab');
+        if (navAdmin) navAdmin.style.setProperty('display', 'none', 'important');
+
+        // 3. Sembunyikan Header (Judul Mayur Groceries & Tombol Keluar)
+        // Kita cari container header di bagian paling atas
+        const headerUtama = document.querySelector('.container-fluid > .d-flex');
+        if (headerUtama) headerUtama.style.setProperty('display', 'none', 'important');
+
+        // 4. Paksa Aktifkan Tab View Customer
+        // Hapus class 'active' dari semua tab-pane
+        document.querySelectorAll('.tab-pane').forEach(tab => {
+            tab.classList.remove('show', 'active');
+        });
+
+        // Aktifkan hanya tab customer
+        const tabCustomer = document.getElementById('tab-view-customer');
+        if (tabCustomer) {
+            tabCustomer.classList.add('show', 'active');
+        } else {
+            console.error("Tab 'tab-view-customer' tidak ditemukan di HTML!");
+        }
+    }
 }

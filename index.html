@@ -143,8 +143,10 @@
             </div>
         </div>
 
+        <!---------------------------------------------------------------------OPERASIONAL------------------------------------------------------>
+
         <div class="tab-content mt-2" id="pills-tabContent">
-            
+
             <div class="tab-pane fade show active" id="tab-operasional" role="tabpanel">
                 <div class="row g-4">
                     <div class="col-md-4">
@@ -287,6 +289,10 @@
                 </div>
             </div>
 
+
+
+
+
             <div class="tab-pane fade" id="tab-master" role="tabpanel">
                 <div class="row g-4">
                     
@@ -370,6 +376,11 @@
                 </div>
             </div>
 
+
+
+
+
+
             <div class="tab-pane fade" id="tab-jurnal" role="tabpanel">
                 <div class="card p-4 border-0 shadow-sm bg-light">
                     <h5 class="fw-bold text-secondary mb-4">Laporan Rekapitulasi Jurnal</h5>
@@ -384,15 +395,41 @@
                 </div>
             </div>
 
+
+
+
+
             <div class="tab-pane fade" id="tab-rundown" role="tabpanel">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h5 class="fw-bold text-secondary m-0">Rundown Kerja Petugas</h5>
-                        <p class="text-muted small m-0">Pantau proses belanja hingga siap kirim</p>
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body py-3">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                            
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="bg-primary bg-opacity-10 p-3 rounded-3 d-none d-sm-block">
+                                    <i class="fas fa-clipboard-list text-primary fs-4"></i>
+                                </div>
+                                <div>
+                                    <h5 class="fw-bold text-dark m-0">Rundown Kerja Petugas</h5>
+                                    <p class="text-muted small m-0">Pantau proses belanja hingga siap kirim</p>
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2 ms-auto ms-md-0">
+                                <div class="position-relative">
+                                    <input type="date" id="filterTglRundown" 
+                                        class="form-control form-control-sm border-primary border-opacity-25 rounded-pill px-3" 
+                                        style="width: 160px; height: 38px;">
+                                </div>
+
+                                <button class="btn btn-primary fw-bold shadow-sm rounded-pill px-3 d-flex align-items-center gap-2" 
+                                        onclick="shareKaryawanLink()" style="height: 38px;">
+                                    <i class="fas fa-share-nodes"></i>
+                                    <span class="d-none d-sm-inline">Share Akses</span>
+                                </button>
+                            </div>
+
+                        </div>
                     </div>
-                    <button class="btn btn-outline-primary fw-bold" onclick="shareKaryawanLink()">
-                        <i class="fas fa-share-alt"></i> Share Link Karyawan
-                    </button>
                 </div>
                 
                 <div id="rundown-container" class="row g-3">
@@ -400,9 +437,7 @@
                 </div>
             </div>
 
-            <div class="tab-content" id="pills-tabContent">
-            <div class="tab-pane fade show active" id="tab-master">
-                </div>
+
 
             <div class="tab-pane fade" id="tab-inventori">
                 <div class="card p-4 border-0 shadow-sm">
@@ -432,7 +467,10 @@
                     </div>
                 </div>
             </div>
-            </div>        
+            
+            
+
+
 
             <div class="tab-pane fade" id="tab-penjualan" role="tabpanel">
                 
@@ -654,75 +692,72 @@
                                 </td>
                             </tr>
                         </table>   
-                        
-                        
                     </div>
                 </div>
             </div>
 
-        </div>
-    </div>
 
-    <div class="tab-pane fade" id="tab-histori" role="tabpanel">
-        <div class="container-fluid py-3 no-print">
-            <div class="row g-3">
-                
-                <div class="col-lg-4 col-md-5">
-                    <div class="card shadow-sm border-0 rounded-4">
-                        <div class="card-header bg-white py-3 border-bottom-0">
-                            <h6 class="fw-bold mb-0 text-success text-center">
-                                <i class="bi bi-archive-fill me-2"></i>ARSIP PENGIRIMAN
-                            </h6>
-                        </div>
-                        
-                        <div class="card-body pt-0">
-                            <div class="bg-light p-2 rounded-3 mb-3">
-                                <input type="text" id="historiSearch" class="form-control form-control-sm border-0 mb-2 shadow-none" placeholder="Cari No. SJ atau Nama..." onkeyup="filterHistori()">
-                                <input type="date" id="historiDate" class="form-control form-control-sm border-0 shadow-none" onchange="filterHistori()">
-                            </div>
 
-                            <div class="d-flex bg-light p-1 rounded-pill mb-3" id="group-toggle-dokumen">
-                                <button type="button" id="btn-mode-sj" class="btn btn-success btn-sm w-100 rounded-pill fw-bold py-1 active" onclick="setHistoriMode('SJ')">
-                                    Surat Jalan
-                                </button>
-                                <button type="button" id="btn-mode-inv" class="btn btn-light btn-sm w-100 rounded-pill fw-bold py-1" onclick="setHistoriMode('INV')">
-                                    Invoice
-                                </button>
-                            </div>
+            <div class="tab-pane fade" id="tab-histori" role="tabpanel">
+                    <div class="container-fluid py-3 no-print">
+                        <div class="row g-3">
+                            
+                            <div class="col-lg-4 col-md-5">
+                                <div class="card shadow-sm border-0 rounded-4">
+                                    <div class="card-header bg-white py-3 border-bottom-0">
+                                        <h6 class="fw-bold mb-0 text-success text-center">
+                                            <i class="bi bi-archive-fill me-2"></i>ARSIP PENGIRIMAN
+                                        </h6>
+                                    </div>
+                                    
+                                    <div class="card-body pt-0">
+                                        <div class="bg-light p-2 rounded-3 mb-3">
+                                            <input type="text" id="historiSearch" class="form-control form-control-sm border-0 mb-2 shadow-none" placeholder="Cari No. SJ atau Nama..." onkeyup="filterHistori()">
+                                            <input type="date" id="historiDate" class="form-control form-control-sm border-0 shadow-none" onchange="filterHistori()">
+                                        </div>
 
-                            <div id="listHistori" class="list-group list-group-flush pe-1" style="max-height: 65vh; overflow-y: auto;">
-                                <div class="text-center py-5 text-muted small">Memuat data...</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                                        <div class="d-flex bg-light p-1 rounded-pill mb-3" id="group-toggle-dokumen">
+                                            <button type="button" id="btn-mode-sj" class="btn btn-success btn-sm w-100 rounded-pill fw-bold py-1 active" onclick="setHistoriMode('SJ')">
+                                                Surat Jalan
+                                            </button>
+                                            <button type="button" id="btn-mode-inv" class="btn btn-light btn-sm w-100 rounded-pill fw-bold py-1" onclick="setHistoriMode('INV')">
+                                                Invoice
+                                            </button>
+                                        </div>
 
-                <div class="col-lg-8 col-md-7">
-                    <div class="card shadow-sm border-0 rounded-4 sticky-top" style="top: 15px;">
-                        <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 border-bottom">
-                            <div class="small fw-bold text-muted ps-2" id="previewTitle">PREVIEW: -</div>
-                            <button onclick="cetakHistoriSJ()" class="btn btn-success btn-sm rounded-pill px-4 shadow-sm fw-bold">
-                                <i class="bi bi-printer me-1"></i> CETAK
-                            </button>
-                        </div>
-                        
-                        <div class="card-body p-0 bg-secondary bg-opacity-10" style="height: 80vh; overflow-y: auto;">
-                            <div id="area-preview-histori" class="bg-white mx-auto shadow my-4" style="width: 210mm; min-height: 160mm; transform: scale(0.9); transform-origin: top center; transition: all 0.3s ease;">
-                                <div class="text-center pt-5 text-muted">
-                                    <i class="bi bi-file-earmark-text display-1 d-block mb-3 opacity-25"></i>
-                                    <p>Pilih data di sebelah kiri untuk melihat rincian.</p>
+                                        <div id="listHistori" class="list-group list-group-flush pe-1" style="max-height: 65vh; overflow-y: auto;">
+                                            <div class="text-center py-5 text-muted small">Memuat data...</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+
+                            <div class="col-lg-8 col-md-7">
+                                <div class="card shadow-sm border-0 rounded-4 sticky-top" style="top: 15px;">
+                                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 border-bottom">
+                                        <div class="small fw-bold text-muted ps-2" id="previewTitle">PREVIEW: -</div>
+                                        <button onclick="cetakHistoriSJ()" class="btn btn-success btn-sm rounded-pill px-4 shadow-sm fw-bold">
+                                            <i class="bi bi-printer me-1"></i> CETAK
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="card-body p-0 bg-secondary bg-opacity-10" style="height: 80vh; overflow-y: auto;">
+                                        <div id="area-preview-histori" class="bg-white mx-auto shadow my-4" style="width: 210mm; min-height: 160mm; transform: scale(0.9); transform-origin: top center; transition: all 0.3s ease;">
+                                            <div class="text-center pt-5 text-muted">
+                                                <i class="bi bi-file-earmark-text display-1 d-block mb-3 opacity-25"></i>
+                                                <p>Pilih data di sebelah kiri untuk melihat rincian.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
-                </div>
-
             </div>
+
         </div>
     </div>
-
-    <div class="modal fade" id="modalEditMaster" tabindex="-1" aria-hidden="true">
-</div>
 
 
 
