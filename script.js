@@ -66,59 +66,97 @@ document.addEventListener('DOMContentLoaded', () => {
 
 //------------------------------------------------------------------------- HALAMAN OPERASIONAL ----------------------------------------------------------
 
-// 4. FUNGSI TAMBAH ITEM (VERSI TERINTEGRASI)
+// 4. FUNGSI TAMBAH ITEM (VERSI TERINTEGRASI + MARKUP NOMINAL)
 function tambahItem() {
+    // 1. Ambil Tanggal dari Input
     const tgl = document.getElementById('tglBarang').value;
+    
+    // Ambil Data Barang
     const idBarangMaster = document.getElementById('selectBarangOperasional').value;
     const selectElement = document.getElementById('selectBarangOperasional');
+    
+    // Validasi jika select kosong
+    if (!idBarangMaster || selectElement.selectedIndex === -1) {
+        alert("Mohon pilih Nama Barang!");
+        return;
+    }
     const namaBarangText = selectElement.options[selectElement.selectedIndex].text;
     
-    // Mengambil ID baru yang kita buat di HTML tadi
     const qtyKotor = parseFloat(document.getElementById('inputQtyKotor').value) || 0;
     const hargaBeli = parseFloat(document.getElementById('inputHargaBeli').value) || 0;
     const rasio = parseFloat(document.getElementById('inputRasioOperasional').value) || 1;
     const petugas = document.getElementById('selectPetugas').value;
 
-    // Tambahkan Markup
-    const markupInput = document.getElementById('markupItem').value;
-    const markupPersen = (markupInput === "" || isNaN(markupInput)) ? 0 : parseFloat(markupInput);
+    // 2. Logika Markup
+    const markupInput = parseFloat(document.getElementById('markupItem').value) || 0;
+    const tipeMarkup = document.getElementById('tipeMarkupOperasional').value;
 
-    if (!tgl || !idBarangMaster || qtyKotor <= 0) {
-        alert("Mohon lengkapi Tanggal, Nama Barang, dan Jumlah!");
+    let hargaJualFinal = 0;
+    if (tipeMarkup === "persen") {
+        hargaJualFinal = hargaBeli + (hargaBeli * (markupInput / 100));
+    } else {
+        hargaJualFinal = hargaBeli + markupInput;
+    }
+
+    // Validasi Lengkap
+    if (!tgl || qtyKotor <= 0) {
+        alert("Mohon lengkapi Tanggal dan Jumlah!");
         return;
     }
 
     const idUnik = Date.now();
     const beratBersih = qtyKotor * rasio;
-    const total = hargaBeli * qtyKotor;
 
+    // MENYUSUN DATA BARU
     const dataBaru = {
-        id: idUnik, // Untuk keperluan hapus/edit
-        tanggal: tgl,
+        id: idUnik,
+        tanggal: tgl, 
         idMaster: idBarangMaster,
         nama: namaBarangText,
-        harga: hargaBeli,      // Kita simpan sebagai 'harga' agar sinkron dengan render lama
-        jumlah: qtyKotor,      // Kita simpan sebagai 'jumlah' agar sinkron dengan render lama
+        harga_pokok: hargaBeli,
+        markup: markupInput,
+        tipe_markup: tipeMarkup,
+        harga: Math.round(hargaJualFinal),
+        jumlah: qtyKotor,
         rasio: rasio,
         qtyBersih: beratBersih,
         petugas: petugas || "Belum Ditunjuk",
-        markupPersen: markupPersen, // Sekarang mengambil dari input
-        status: "Proses",
+        
+        // --- MODIFIKASI UNTUK SURAT JALAN ---
+        // 'status_sj' digunakan khusus untuk memfilter tampilan Surat Jalan
+        status_sj: "pending", 
+        
+        // 'status' bawaan (untuk rundown/proses tetap "Proses")
+        status: "Proses", 
+        // ------------------------------------
+        
         timestamp: idUnik
     };
 
     db.ref("belanja/" + idUnik).set(dataBaru).then(() => {
-        alert("Berhasil disimpan!");
-        resetForm();
+        alert("Berhasil disimpan untuk tanggal: " + tgl);
+        resetForm(); 
+    }).catch((error) => {
+        alert("Gagal menyimpan: " + error.message);
     });
 }
 
 function resetForm() {
+    // Reset input teks dan angka
     document.getElementById('selectBarangOperasional').value = '';
     document.getElementById('inputHargaBeli').value = '';
     document.getElementById('inputQtyKotor').value = '';
+    document.getElementById('markupItem').value = '';
     document.getElementById('inputRasioOperasional').value = '1';
-    document.getElementById('displayBeratBersih').innerText = '0';
+    
+    // Reset tampilan visual (jika ada)
+    if(document.getElementById('displayBeratBersih')) {
+        document.getElementById('displayBeratBersih').innerText = '0';
+    }
+
+    // KUNCI: Jangan reset document.getElementById('tglBarang').value
+    // Biarkan tetap pada tanggal yang dipilih user sebelumnya.
+    console.log("Form di-reset, tapi tanggal tetap dipertahankan.");
 }
 
 // 5. RENDER TABEL HARIAN (OPERASIONAL) - VERSI UPDATE
@@ -186,7 +224,9 @@ function renderTabelHarian(data) {
                 <td class="text-center py-2 pe-2" style="width: 15%; ${styleKolom}">
                     <div class="btn-group shadow-sm bg-white p-1 border rounded">
                         <button onclick="bukaModalHarga('${item.id}', '${item.nama}', ${item.harga_pokok || item.harga}, ${item.markup || 0})" 
-                                class="btn btn-sm btn-light border-0 p-1 px-sm-2">✏️</button>
+                                class="btn btn-sm btn-light border-0 p-1 px-sm-2">
+                            ✏️
+                        </button>
                         <button onclick="hapusItem('${item.id}')" class="btn btn-sm btn-outline-danger border-0 p-1 px-sm-2 d-none d-sm-inline-block">✕</button>
                         <div class="d-flex align-items-center px-1 px-sm-2 border-start ms-1">
                             <input type="checkbox" class="form-check-input check-item m-0" value="${item.id}" onchange="updateTampilanTombolHapus()" style="width: 1.2rem; height: 1.2rem;">
@@ -196,6 +236,59 @@ function renderTabelHarian(data) {
             </tr>`;
     });
     container.innerHTML = html || '<tr><td colspan="5" class="text-center py-5">Belum ada jadwal.</td></tr>';
+}
+
+// 1. Fungsi Membuka Modal (Memasukkan data ke dalam form modal)
+function bukaModalHarga(id, nama, hargaPokok, markup) {
+    // Pastikan ID ini ada di HTML Anda
+    document.getElementById('editItemId').value = id;
+    document.getElementById('editItemNama').value = nama;
+    document.getElementById('editHargaPokok').value = hargaPokok || 0;
+    document.getElementById('editNilaiMarkup').value = markup || 0;
+    document.getElementById('editTipeMarkup').value = "persen"; 
+
+    hitungHargaFinal(); // Hitung angka awal agar tidak Rp 0 saat buka
+
+    const modalEdit = new bootstrap.Modal(document.getElementById('modalEditHarga'));
+    modalEdit.show();
+}
+
+// 2. Fungsi Hitung Otomatis (Logika Persen vs Nominal)
+function hitungHargaFinal() {
+    const hp = parseFloat(document.getElementById('editHargaPokok').value) || 0;
+    const markup = parseFloat(document.getElementById('editNilaiMarkup').value) || 0;
+    const tipe = document.getElementById('editTipeMarkup').value;
+    
+    let total = 0;
+    if (tipe === "persen") {
+        total = hp + (hp * (markup / 100));
+    } else {
+        total = hp + markup;
+    }
+
+    // Update tampilan Rp di kotak biru modal
+    document.getElementById('displayHargaFinal').innerText = "Rp " + Math.round(total).toLocaleString('id-ID');
+    return Math.round(total);
+}
+
+// 3. Fungsi Simpan (Eksekusi ke Firebase)
+function simpanPerubahanHarga() {
+    const id = document.getElementById('editItemId').value;
+    const hp = parseFloat(document.getElementById('editHargaPokok').value) || 0;
+    const markup = parseFloat(document.getElementById('editNilaiMarkup').value) || 0;
+    const hargaFinal = hitungHargaFinal(); // Ambil harga hasil perhitungan
+
+    db.ref("belanja/" + id).update({
+        harga_pokok: hp,
+        markup: markup,
+        harga: hargaFinal 
+    }).then(() => {
+        // Tutup modal
+        const modalEl = document.getElementById('modalEditHarga');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        modalInstance.hide();
+        console.log("Update Sukses!");
+    }).catch((err) => alert("Gagal: " + err.message));
 }
 
 
@@ -242,12 +335,17 @@ function loadMasterKeOperasional() {
 
 // 4. Jalankan Keduanya saat Halaman Dibuka
 window.addEventListener('load', () => {
-    loadMasterKeOperasional(); // Isi dropdown dulu
-    inisialisasiDataHarian();   // Baru tarik data belanja hari ini
+    loadMasterKeOperasional(); 
+    inisialisasiDataHarian();   
     
-    // Set default tanggal di form input ke hari ini
-    if(document.getElementById('tglBarang')) {
-        document.getElementById('tglBarang').value = tglHariIni;
+    const inputTgl = document.getElementById('tglBarang');
+    if (inputTgl) {
+        // HANYA isi ke hari ini jika inputTgl masih kosong
+        if (!inputTgl.value) {
+            inputTgl.value = tglHariIni;
+        }
+        // Jika sudah ada isinya (karena tidak di-reset oleh resetForm), 
+        // biarkan saja, jangan dipaksa balik ke hari ini.
     }
 });
 
@@ -489,180 +587,451 @@ function tutupMenu() {
     if (instance) instance.hide();
 }
 
-//------------------------------------------------------------------------- HALAMAN JURNAL ----------------------------------------------------------
 
-// 8. FUNGSI JURNAL
+//------------------------------------------------------------------------- HALAMAN JURNAL ----------------------------------------------------------
+let labaKotorTerakhir = 0;
+
 function renderJurnal(dataArr) {
     const container = document.getElementById('jurnal-container');
     if (!container || !dataArr) return;
 
-    let html = `
-        <div class="table-responsive rounded-3 shadow-sm bg-white border">
-            <table class="table table-hover align-middle m-0">
+    let html = `<div class="table-responsive rounded-3 shadow-sm bg-white border">
+                <table class="table table-hover align-middle m-0">
                 <thead class="bg-success text-white small text-uppercase">
                     <tr>
-                        <th class="ps-3 py-3 border-0">Item & Info</th>
-                        <th class="text-center border-0">Modal</th>
-                        <th class="text-center border-0">Markup</th>
-                        <th class="text-end pe-3 border-0">Tagihan</th>
+                        <th class="ps-3 py-3">Tanggal & Item</th>
+                        <th class="text-center">Modal</th>
+                        <th class="text-center">Markup</th>
+                        <th class="text-end pe-3">Tagihan</th>
                     </tr>
-                </thead>
-                <tbody>`;
+                </thead><tbody>`;
 
     let totalModal = 0;
     let totalTagihan = 0;
-
     const sortedData = [...dataArr].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 
     sortedData.forEach(item => {
-        const mPersen = item.markupPersen || 0; // Sekarang default 0 sesuai permintaanmu sebelumnya
-        
-        // Modal tetap dihitung dari uang yang keluar di pasar (Harga Beli * Qty Kotor)
-        const modal = (item.harga || 0) * (item.jumlah || 0); 
-        
-        // Tagihan dihitung dari Modal + Keuntungan yang diinginkan
-        const tagihan = modal * (1 + (mPersen / 100));
-        
-        // HITUNG HARGA JUAL PER KG BERSIH (Untuk info ke pelanggan)
-        const hargaJualBersih = item.qtyBersih > 0 ? tagihan / item.qtyBersih : 0;
+        const modal = (parseFloat(item.harga_pokok) || 0) * (parseFloat(item.jumlah) || 0);
+        const qtyBersih = parseFloat(item.qtyBersih) || parseFloat(item.jumlah) || 0;
+        const markupVal = parseFloat(item.markup) || 0;
+        let tagihan = (item.tipe_markup === "nominal") ? modal + (markupVal * qtyBersih) : modal * (1 + (markupVal / 100));
+        let infoMarkup = (item.tipe_markup === "nominal") ? `Rp ${markupVal.toLocaleString('id-ID')}/kg` : `${markupVal}%`;
 
         totalModal += modal;
         totalTagihan += tagihan;
 
-        html += `
-            <tr class="border-bottom">
-                <td class="ps-3 py-3">
-                    <div class="fw-bold text-dark">${item.nama}</div>
-                    <div class="text-muted small" style="font-size: 0.7rem;">
-                        Net: ${item.qtyBersih?.toFixed(2) || 0} kg | Jual: Rp ${Math.round(hargaJualBersih).toLocaleString('id-ID')}/kg
-                    </div>
-                </td>
-                <td class="text-center text-secondary small">
-                    Rp ${modal.toLocaleString('id-ID')}
-                </td>
-                <td class="text-center">
-                    <span class="badge rounded-pill text-dark px-3" 
-                        style="background-color: #ffc107; font-size: 0.7rem; font-weight: 800;">
-                        ${mPersen}%
-                    </span>
-                </td>
-                <td class="text-end fw-bold text-success pe-3">
-                    Rp ${tagihan.toLocaleString('id-ID')}
-                </td>
-            </tr>`;
+        html += `<tr class="border-bottom">
+            <td class="ps-3 py-3">
+                <div class="text-muted" style="font-size: 0.7rem;">${item.tanggal || '-'}</div>
+                <div class="fw-bold text-dark">${item.nama.toUpperCase()}</div>
+                <div class="small text-muted">Net: ${qtyBersih.toFixed(2)} ${item.satuan || 'KG'}</div>
+            </td>
+            <td class="text-center text-secondary small">Rp ${modal.toLocaleString('id-ID')}</td>
+            <td class="text-center"><span class="badge rounded-pill text-dark px-3" style="background-color: #ffc107; font-size: 0.7rem;">${infoMarkup}</span></td>
+            <td class="text-end fw-bold text-success pe-3">Rp ${tagihan.toLocaleString('id-ID')}</td>
+        </tr>`;
     });
 
-    const totalProfit = totalTagihan - totalModal;
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
 
-    html += `
-                </tbody>
-                <tfoot class="bg-dark text-white">
-                    <tr class="fw-bold">
-                        <td class="ps-3 py-3">RINGKASAN TOTAL</td>
-                        <td class="text-center small text-light">Rp ${totalModal.toLocaleString('id-ID')}</td>
-                        <td class="text-center text-warning" style="font-size: 0.75rem; letter-spacing: 0.5px;">
-                            EST. PROFIT: Rp ${totalProfit.toLocaleString('id-ID')}
-                        </td>
-                        <td class="text-end pe-3 text-dark" style="font-size: 1.1rem;">
-                            Rp ${totalTagihan.toLocaleString('id-ID')}
-                        </td>
-                    </tr>
-                </tfoot>
-            </table>
+    labaKotorTerakhir = totalTagihan - totalModal;
+    renderAreaKalkulasiLaba(labaKotorTerakhir);
+}
+
+function renderAreaKalkulasiLaba(labaKotor) {
+    const summaryContainer = document.getElementById('summary-laba-container');
+    if (!summaryContainer) return;
+
+    summaryContainer.innerHTML = `
+        <div class="row g-4 mt-2">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm border-top border-primary border-4">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-calendar-plus me-2 text-primary"></i> CATAT PENGELUARAN</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label small mb-1">Tanggal Biaya</label>
+                            <input type="date" id="in-tgl-biaya" class="form-control form-control-sm">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small mb-1">Bensin & Transportasi</label>
+                            <input type="number" id="in-bensin" class="form-control" placeholder="0">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small mb-1">Sewa/Gudang</label>
+                            <input type="number" id="in-sewa" class="form-control" placeholder="0">
+                        </div>
+                        <div class="p-3 bg-light rounded border mb-3">
+                            <label class="form-label small mb-1">Biaya Lain-lain</label>
+                            <input type="text" id="in-nama-lain" class="form-control form-control-sm mb-2" placeholder="Nama Biaya">
+                            <input type="number" id="in-jumlah-lain" class="form-control form-control-sm" placeholder="0">
+                        </div>
+                        <button onclick="simpanBiayaHarian()" class="btn btn-primary w-100 fw-bold">
+                            <i class="bi bi-plus-circle me-2"></i> TAMBAHKAN KE DAFTAR
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div id="container-tabel-biaya"></div>
+                <div id="container-ringkasan-akhir" class="mt-4"></div>
+            </div>
         </div>`;
 
-    container.innerHTML = html;
+    document.getElementById('in-tgl-biaya').valueAsDate = new Date();
+    loadTabelBiayaHarian();
 }
 
-function tambahBiaya() {
-    const nama = document.getElementById('namaBiaya').value.trim();
-    const nominal = parseFloat(document.getElementById('nominalBiaya').value);
-    const tgl = document.getElementById('tglBarang').value;
+function simpanBiayaHarian() {
+    const tgl = document.getElementById('in-tgl-biaya').value;
+    const bensin = parseFloat(document.getElementById('in-bensin').value) || 0;
+    const sewa = parseFloat(document.getElementById('in-sewa').value) || 0;
+    const lain = parseFloat(document.getElementById('in-jumlah-lain').value) || 0;
+    const namaLain = document.getElementById('in-nama-lain').value || "-";
 
-    if (!nama || isNaN(nominal)) {
-        alert("Isi keterangan biaya dan nominalnya!");
-        return;
-    }
+    if (!tgl) return alert("Pilih tanggal!");
 
-    const idUnik = Date.now();
     const dataBiaya = {
-        tanggal: tgl,
-        nama: `[BIAYA] ${nama}`,
-        harga: nominal,
-        jumlah: 1,
-        kategori: "Operasional",
-        petugas: "Sistem",
-        markupPersen: 0,
-        status: "Pengeluaran",
-        timestamp: idUnik
+        tanggal: tgl, bensin, sewa, 
+        tambahan: { nama: namaLain, jumlah: lain },
+        total: bensin + sewa + lain,
+        timestamp: new Date().getTime()
     };
 
-    db.ref("belanja/" + idUnik).set(dataBiaya).then(() => {
-        document.getElementById('namaBiaya').value = "";
-        document.getElementById('nominalBiaya').value = "";
-        alert("Biaya dicatat.");
+    db.ref('BiayaHarian').push(dataBiaya).then(() => {
+        alert("✅ Berhasil dicatat!");
+        document.querySelectorAll('#in-bensin, #in-sewa, #in-jumlah-lain, #in-nama-lain').forEach(el => el.value = "");
     });
 }
 
-function filterDataHarian() {
-    const tglMulai = document.getElementById('filterTglMulai').value;
-    const tglSelesai = document.getElementById('filterTglSelesai').value;
-    const kategori = document.getElementById('filterKategoriRingkasan').value; // Ambil nilai kategori
+function loadTabelBiayaHarian() {
+    const tableContainer = document.getElementById('container-tabel-biaya');
+    db.ref('BiayaHarian').orderByChild('tanggal').on('value', snapshot => {
+        if (!snapshot.exists()) {
+            tableContainer.innerHTML = `<div class="alert alert-light border text-center">Belum ada catatan.</div>`;
+            updateKalkulasiAkhir({ labaKotor: labaKotorTerakhir, totalPengeluaran: 0, labaBersihRiil: labaKotorTerakhir });
+            return;
+        }
+
+        let totalSeluruhBiaya = 0;
+        let rows = "";
+        snapshot.forEach(child => {
+            const val = child.val();
+            totalSeluruhBiaya += val.total;
+            rows += `<tr>
+                <td class="fw-bold">${val.tanggal.split('-').reverse().slice(0,2).join('/')}</td>
+                <td>Rp ${val.bensin.toLocaleString('id-ID')}</td>
+                <td>Rp ${val.sewa.toLocaleString('id-ID')}</td>
+                <td class="small text-muted">${val.tambahan.nama}: Rp ${val.tambahan.jumlah.toLocaleString('id-ID')}</td>
+                <td class="text-end pe-3 fw-bold text-danger">Rp ${val.total.toLocaleString('id-ID')}</td>
+            </tr>`;
+        });
+
+        tableContainer.innerHTML = `
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive" style="max-height: 250px;">
+                    <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                        <thead class="table-light"><tr><th>Tgl</th><th>Bensin</th><th>Sewa</th><th>Lainnya</th><th class="text-end">Total</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            </div>`;
+
+        const tglMulai = document.getElementById('filter-tgl-mulai').value || "-";
+        const tglSelesai = document.getElementById('filter-tgl-selesai').value || "-";
+
+        updateKalkulasiAkhir({
+            periode: `${tglMulai} s/d ${tglSelesai}`,
+            labaKotor: labaKotorTerakhir,
+            totalPengeluaran: totalSeluruhBiaya,
+            labaBersihRiil: labaKotorTerakhir - totalSeluruhBiaya
+        });
+    });
+}
+
+function updateKalkulasiAkhir(dataBiaya) {
+    const finalContainer = document.getElementById('container-ringkasan-akhir');
+    if (!finalContainer) return;
+
+    finalContainer.innerHTML = `
+        <div class="card border-0 shadow-sm bg-white rounded-4 overflow-hidden border-top border-primary border-4 no-print">
+            <div class="card-body p-4">
+                <div class="d-flex flex-column-reverse flex-md-row align-items-center">
+                    
+                    <div class="col-md-8 col-12 border-md-end pe-md-4 mt-4 mt-md-0">
+                        <div class="mb-3">
+                            <span class="badge bg-primary-subtle text-primary mb-2">Periode: ${dataBiaya.periode || '-'}</span>
+                            <h5 class="fw-bold text-dark mb-4 text-uppercase">Hasil Laba Bersih Riil</h5>
+                        </div>
+
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Total Penjualan</span>
+                            <span class="fw-bold text-dark">Rp ${dataBiaya.labaKotor.toLocaleString('id-ID')}</span>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mb-3 text-danger">
+                            <span class="text-muted">Total Pengeluaran</span>
+                            <span class="fw-bold">(-) Rp ${dataBiaya.totalPengeluaran.toLocaleString('id-ID')}</span>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <span class="fw-bold h6 mb-0 text-secondary">KEUNTUNGAN BERSIH</span>
+                            <span class="h2 fw-bold mb-0 text-primary">Rp ${dataBiaya.labaBersihRiil.toLocaleString('id-ID')}</span>
+                        </div>
+
+                        <div class="row g-2 mt-3 no-print">
+                            <div class="col-6">
+                                <button onclick="simpanLaporanFinalKeFirebase()" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">
+                                    <i class="bi bi-cloud-arrow-up-fill me-2"></i> FIREBASE
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <button onclick="unduhPDFLaporan()" class="btn btn-danger w-100 py-2 fw-bold shadow-sm">
+                                    <i class="bi bi-file-earpdf-fill me-2"></i> UNDUH PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        <p class="mt-3 mb-0 text-muted small italic">
+                            <i class="bi bi-info-circle-fill me-1"></i> Data diperbarui otomatis dari database Firebase.
+                        </p>
+                    </div>
+                    
+                    <div class="col-md-4 col-12 text-center mb-4 mb-md-0">
+                        <div class="chart-wrapper" style="position: relative; height: 220px; width: 100%;">
+                            <canvas id="finalDonutChart"></canvas>
+                        </div>
+                        <div class="mt-2 no-print">
+                            <small class="text-muted fw-bold" style="font-size: 0.7rem;">KOMPOSISI KEUANGAN</small>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Render Chart dengan delay kecil agar elemen canvas siap di DOM
+    setTimeout(() => {
+        renderFinalChart(dataBiaya.labaKotor, dataBiaya.totalPengeluaran);
+    }, 150);
+}
+
+// Pastikan variabel global ini ada di paling atas file JS Anda
+let myFinalChart = null; 
+
+function renderFinalChart(penjualan, biaya) {
+    const canvas = document.getElementById('finalDonutChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const ctx = canvas.getContext('2d');
+    
+    // Hitung Sisa Laba (Jika Rugi, set ke 0 agar chart tidak error)
+    const sisaLaba = penjualan > biaya ? penjualan - biaya : 0;
+
+    // Hancurkan chart lama agar tidak bentrok (Menghindari Error Canvas sudah digunakan)
+    if (myFinalChart) {
+        myFinalChart.destroy();
+    }
+
+    // Buat Chart Baru
+    myFinalChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Untung Bersih', 'Biaya Ops'],
+            datasets: [{
+                data: [sisaLaba, biaya],
+                // --- PERUBAHAN 1: GANTI WARNA (Hijau & Oranye) ---
+                backgroundColor: [
+                    '#198754', // Hijau Success (Bootstrap)
+                    '#fd7e14'  // Oranye Warning (Bootstrap)
+                ],
+                borderWidth: 2,
+                borderColor: '#ffffff', // Beri sedikit border putih agar elegan
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            // Matikan animasi agar saat di-unduh PDF, grafik sudah "diam"
+            animation: false, 
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { 
+                        boxWidth: 12, 
+                        font: { size: 11 },
+                        padding: 15
+                    }
+                },
+                // Optional: Tambahkan tooltip agar angka muncul saat di-hover
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) { label += ': '; }
+                            if (context.parsed !== null) {
+                                label += 'Rp ' + context.parsed.toLocaleString('id-ID');
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            // --- PERUBAHAN 2: BUAT DONAT LEBIH TEBAL (Kecilkan Cutout) ---
+            // Nilai lama mungkin 75%, kita ubah jadi 55% agar tebal seperti Pie tapi tetap berlubang
+            cutout: '55%' 
+        }
+    });
+}
+
+function simpanLaporanFinalKeFirebase() {
+    // 1. Ambil data dari input biaya (jika ada)
+    const bensin = parseFloat(document.getElementById('in-bensin')?.value) || 0;
+    const sewa = parseFloat(document.getElementById('in-sewa')?.value) || 0;
+    const jumlahLain = parseFloat(document.getElementById('in-jumlah-lain')?.value) || 0;
+    const namaLain = document.getElementById('in-nama-lain')?.value || "Lain-lain";
+    
+    // 2. Ambil periode dari filter tanggal
+    const tglMulai = document.getElementById('filter-tgl-mulai')?.value;
+    const tglSelesai = document.getElementById('filter-tgl-selesai')?.value;
 
     if (!tglMulai || !tglSelesai) {
-        alert("Pilih rentang tanggal terlebih dahulu!");
+        return alert("Harap tentukan rentang tanggal (Filter) terlebih dahulu!");
+    }
+
+    const totalBiaya = bensin + sewa + jumlahLain;
+
+    // 3. Susun objek data sesuai struktur database Anda
+    const dataLaporan = {
+        periode: `${tglMulai} s/d ${tglSelesai}`,
+        labaKotor: labaKotorTerakhir, // Diambil dari variabel global
+        biayaOperasional: {
+            bensin: bensin,
+            sewa: sewa,
+            tambahan: { nama: namaLain, jumlah: jumlahLain }
+        },
+        totalPengeluaran: totalBiaya,
+        labaBersihRiil: labaKotorTerakhir - totalBiaya,
+        tanggalSimpan: new Date().toISOString()
+    };
+
+    // 4. Proses Simpan ke Firebase
+    // Pastikan 'db' adalah variabel firebase.database() Anda
+    db.ref('LaporanFinal').push(dataLaporan)
+        .then(() => {
+            alert("✅ Laporan Berhasil Diarsipkan!");
+        })
+        .catch((error) => {
+            console.error("Firebase Error:", error);
+            alert("Gagal menyimpan: " + error.message);
+        });
+}
+
+function unduhPDFLaporan() {
+    // Mengambil elemen berdasarkan Class karena di HTML Anda tidak ada ID khusus
+    const element = document.querySelector('.area-cetak-jurnal'); 
+    
+    const tglMulai = document.getElementById('filter-tgl-mulai')?.value || "Laporan";
+    const tglSelesai = document.getElementById('filter-tgl-selesai')?.value || "Periode";
+
+    if (!element) {
+        return alert("Error: Area cetak '.area-cetak-jurnal' tidak ditemukan!");
+    }
+
+    const opsi = {
+        margin:       [10, 10, 10, 10],
+        filename:     `Laporan_Jurnal_${tglMulai}_sd_${tglSelesai}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { 
+            scale: 2, 
+            useCORS: true, 
+            logging: false,
+            // Memastikan background putih ikut tercetak
+            backgroundColor: '#ffffff' 
+        },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    // Tombol Loading
+    const btn = event.currentTarget;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> PROSES...';
+    btn.disabled = true;
+
+    html2pdf().set(opsi).from(element).save().then(() => {
+        btn.innerHTML = '<i class="bi bi-file-earpdf-fill me-2"></i> SIMPAN PDF';
+        btn.disabled = false;
+    }).catch(err => {
+        alert("Gagal: " + err.message);
+        btn.disabled = false;
+    });
+}
+
+async function unduhPDFLaporan() {
+    const element = document.querySelector('.area-cetak-jurnal');
+    
+    // Pastikan elemen ada dan tidak kosong
+    if (!element || element.innerText.includes("Silakan pilih tanggal")) {
+        return alert("Data belum difilter atau tabel masih kosong!");
+    }
+
+    const btn = event.currentTarget;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> MENYIAPKAN...';
+    btn.disabled = true;
+
+    // Tambahkan jeda 500ms agar browser "tenang" setelah render JS
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const opsi = {
+        margin:       [10, 10, 10, 10],
+        filename:     `Laporan_Full.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { 
+            scale: 2, 
+            useCORS: true, 
+            logging: false,
+            letterRendering: true, // Membantu merender teks dari JS lebih akurat
+            scrollY: 0 // Mencegah bagian atas terpotong jika halaman di-scroll
+        },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+
+    html2pdf().set(opsi).from(element).save().then(() => {
+        btn.innerHTML = '<i class="bi bi-file-earpdf-fill me-2"></i> SIMPAN PDF';
+        btn.disabled = false;
+    });
+}
+
+function jalankanFilterJurnal() {
+    const tglMulai = document.getElementById('filter-tgl-mulai').value;
+    const tglSelesai = document.getElementById('filter-tgl-selesai').value;
+
+    if (!tglMulai || !tglSelesai) return alert("Pilih tanggal dulu!");
+
+    const dataFiltered = databaseBelanja.filter(item => {
+        return item.tanggal >= tglMulai && item.tanggal <= tglSelesai;
+    });
+
+    if (dataFiltered.length === 0) {
+        document.getElementById('jurnal-container').innerHTML = "<p class='text-center'>Data tidak ditemukan.</p>";
         return;
     }
 
-    // Filter data berdasarkan rentang tanggal DAN Kategori
-    const dataFiltered = databaseBelanja.filter(item => {
-        const matchTanggal = item.tanggal >= tglMulai && item.tanggal <= tglSelesai;
-        const matchKategori = (kategori === "Semua" || item.kategori === kategori);
-        
-        return matchTanggal && matchKategori;
-    });
-
-    // Render ulang tabel harian dengan data yang sudah difilter (Tanggal + Kategori)
-    renderTabelHarian(dataFiltered);
-    
-    // Update Ringkasan Total khusus untuk data yang difilter
-    const totalFiltered = dataFiltered.reduce((acc, curr) => {
-        const harga = curr.harga || 0;
-        const jumlah = curr.jumlah || 0;
-        return acc + (harga * jumlah);
-    }, 0);
-
-    const disp = document.getElementById('grandTotal');
-    if(disp) {
-        disp.innerText = `Total: Rp ${totalFiltered.toLocaleString('id-ID')}`;
-    }
+    renderJurnal(dataFiltered);
 }
 
-function sinkronkanDropdownKategori() {
-    const selectFilter = document.getElementById('filterKategoriRingkasan');
-    if (!selectFilter) return;
-
-    db.ref("kategori").on("value", (snapshot) => {
-        const daftarKategori = snapshot.val();
-        
-        // Simpan pilihan "Semua" agar tidak hilang
-        let htmlOptions = '<option value="Semua">Semua Kategori</option>';
-
-        if (daftarKategori) {
-            Object.keys(daftarKategori).forEach(key => {
-                const namaKategori = daftarKategori[key].nama; // Sesuaikan jika nama fieldnya bukan 'nama'
-                htmlOptions += `<option value="${namaKategori}">${namaKategori}</option>`;
-            });
-        }
-        
-        selectFilter.innerHTML = htmlOptions;
-    });
+// Fungsi pembantu untuk format tanggal agar rapi di laporan
+function formatTanggalIndo(tgl) {
+    if(!tgl) return "-";
+    const opsi = { day: 'numeric', month: 'long', year: 'numeric' };
+    return new Date(tgl).toLocaleDateString('id-ID', opsi);
 }
 
-// Tambahkan di baris render jurnal untuk update status ke Firebase
-function tandaiLunas(id) {
-    db.ref("belanja/" + id).update({ statusBayar: "Lunas" });
-}
 
 //------------------------------------------------------------------------- HALAMAN RUNDOWN ----------------------------------------------------------
 
@@ -833,17 +1202,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
-
-
-
-
-
-
-
-
-
-
-
 
 
 // Listener untuk menampilkan Tabel Inventori
@@ -1138,21 +1496,6 @@ db.ref("belanja").on("value", (snapshot) => {
 });
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Variable sementara untuk menampung item yang akan diprint
 let keranjangKirim = [];
 
@@ -1209,11 +1552,11 @@ function renderPreviewSuratJalan() {
     if(document.getElementById('p_alamat')) document.getElementById('p_alamat').innerText = alamat;
     
     // 2. FILTER DATA: Ambil hanya yang SIAP tapi BELUM berstatus "Sudah Dikirim"
-    // Pastikan window.databaseBelanjaHarian sudah terisi dari Firebase
     const itemsSiapCetak = (window.databaseBelanjaHarian || []).filter(item => 
-        item.tanggal === tglHariIni && 
         item.step3 === true && 
-        item.statusAlur !== "Sudah Dikirim"
+        item.statusAlur !== "Sudah Dikirim" &&
+        // --- TAMBAHKAN FILTER INI ---
+        (item.status_sj === "pending" || item.status_sj === undefined)
     );
 
     const tbody = document.getElementById('listKirim');
@@ -1338,10 +1681,20 @@ function sinkronkanSuratJalan() {
     const containerUtama = document.getElementById('area-cetak'); 
     if (!containerUtama) return;
 
-    const itemsSiap = databaseBelanja.filter(item => item.step3 === true);
+    // --- MODIFIKASI FILTER DISINI ---
+    // Menambahkan pengecekan status_sj agar tidak terjadi penumpukan data lama
+    const itemsSiap = databaseBelanja.filter(item => 
+        item.step3 === true && 
+        (item.status_sj === "pending" || item.status_sj === undefined)
+    );
+    // --------------------------------
     
     if (itemsSiap.length === 0) {
-        containerUtama.innerHTML = '<div class="text-center py-5 text-muted no-print">Belum ada barang yang berstatus SIAP.</div>';
+        containerUtama.innerHTML = `
+            <div class="text-center py-5 no-print">
+                <div class="text-muted mb-2">Belum ada barang yang berstatus SIAP (Pending).</div>
+                <small class="text-danger">Pastikan Step 3 di Rundown sudah dicentang dan item belum dikirim sebelumnya.</small>
+            </div>`;
         return;
     }
 
@@ -1374,7 +1727,7 @@ function sinkronkanSuratJalan() {
         kumpulanHalaman.push(itemsSiap.slice(i, i + perHalaman));
     }
 
-    // 2. Reset container (Bersihkan tampilan agar tidak menumpuk)
+    // 2. Reset container
     containerUtama.innerHTML = ''; 
     containerUtama.style.background = 'transparent';
     containerUtama.style.border = 'none';
@@ -1388,12 +1741,15 @@ function sinkronkanSuratJalan() {
         let rowsHtml = '';
         halamanItems.forEach((item, idx) => {
             const noUrut = (index * perHalaman) + (idx + 1);
+            // Gunakan qtyBersih jika ada, jika tidak gunakan jumlah biasa
+            const displayQty = item.qtyBersih ? Number(item.qtyBersih).toFixed(2) : (item.jumlah || 0);
+            
             rowsHtml += `
                 <tr>
                     <td style="border: 1px solid #000; padding: 8px; text-align: center;">${noUrut}</td>
-                    <td style="border: 1px solid #000; padding: 8px 12px; text-transform: uppercase;">${item.nama}</td>
+                    <td style="border: 1px solid #000; padding: 8px 12px; text-transform: uppercase; font-weight: bold;">${item.nama}</td>
                     <td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">
-                        ${item.qtyBersih ? item.qtyBersih.toFixed(2) : (item.jumlah || 0)} KG
+                        ${displayQty} KG
                     </td>
                 </tr>`;
         });
@@ -1403,7 +1759,7 @@ function sinkronkanSuratJalan() {
             rowsHtml += `<tr><td style="border: 1px solid #000; padding: 18px;">&nbsp;</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
         }
 
-        // 3. Render Struktur (Gaya yang sama dengan Invoice)
+        // 3. Render Struktur
         containerUtama.innerHTML += `
             <div class="halaman-surat-jalan-print" style="${index > 0 ? 'page-break-before: always;' : ''} width: 100%; color: #000; font-family: Arial, sans-serif; background: white; padding: 25px;">
                 
@@ -1411,8 +1767,8 @@ function sinkronkanSuratJalan() {
                     <div style="flex: 1;">
                         
                         <div style="font-size: 11px; line-height: 1.3;">
-                            <strong style="font-size: 14px;"></strong><br>
-                            Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo
+                            <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
+                            Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
                             wiwitdianasari@gmail.com | 0858 4347 4469
                         </div>
                     </div>
@@ -1457,53 +1813,67 @@ function sinkronkanSuratJalan() {
                 </table>
 
                 <hr style="border-top: 1px dashed #ccc; margin: 30px 0;" class="no-print">
-            </div>`;});
+            </div>`;
+    });
 
-    
+    // Simpan data yang sedang tampil ke variabel global agar bisa di-update statusnya saat cetak
+    window.itemsAkanDicetak = itemsSiap;
 }
 
-// FUNGSI UNTUK UPDATE TAMPILAN SURAT JALAN SECARA REAL-TIME
-function updatePreviewSJ() {
-    const noSJ = document.getElementById('sj_nomor').value;
-    const tglInput = document.getElementById('sj_tanggal').value;
-    const alamatFull = document.getElementById('sj_alamat').value;
+function aktifkanLiveTracking() {
+    const container = document.getElementById('container-view-customer');
+    if (!container) return;
+    
+    container.innerHTML = ''; 
 
-    // 1. Update Nomor SJ
-    const pNo = document.getElementById('p_noSJ');
-    if (pNo) pNo.innerText = noSJ || "......";
+    // --- MODIFIKASI FILTER DISINI ---
+    // Hanya tampilkan barang yang belum berstatus "Sudah Dikirim"
+    // Ini agar tampilan customer bersih dari riwayat pengiriman lama
+    const dataAktif = databaseBelanja.filter(item => 
+        item.statusAlur !== "Sudah Dikirim" && 
+        item.status_sj !== "dikirim"
+    );
 
-    // 2. Update Tanggal
-    const pTgl = document.getElementById('p_lokasi_tgl');
-    if (pTgl && tglInput) {
-        const d = new Date(tglInput);
-        const daftarBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
-        pTgl.innerText = `SIDOARJO, ${d.getDate()} ${daftarBulan[d.getMonth()]} ${d.getFullYear()}`;
-    }
+    dataAktif.forEach((item) => {
+        const isStep1 = item.step1 === true;
+        const isStep2 = item.step2 === true;
+        const isStep3 = item.step3 === true;
 
-    // 3. Update Nama & Alamat (Mendukung Multi-baris)
-    const pCust = document.getElementById('p_cust');
-    const pAlamat = document.getElementById('p_alamat');
+        container.innerHTML += `
+        <div class="order-item-card mb-3 p-3 border rounded shadow-sm bg-white">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold m-0 text-uppercase" style="font-size: 0.9rem;">
+                    ${item.nama} <span class="text-muted">(${item.qtyBersih || item.jumlah} KG)</span>
+                </h6>
+                <span class="badge ${isStep3 ? 'bg-success' : 'bg-warning text-dark'}" style="font-size: 0.7rem;">
+                    ${item.statusAlur || 'Rencana'}
+                </span>
+            </div>
+            
+            <div class="d-flex align-items-center justify-content-between px-2 mt-3">
+                <div class="text-center" style="width: 60px;">
+                    <div class="step-dot ${isStep1 ? 'active-blue' : ''}">1</div>
+                    <div class="step-text">Belanja</div>
+                </div>
+                <div class="step-line ${isStep2 ? 'active-line' : ''}"></div>
+                
+                <div class="text-center" style="width: 60px;">
+                    <div class="step-dot ${isStep2 ? 'active-orange' : ''}">2</div>
+                    <div class="step-text">Proses</div>
+                </div>
+                <div class="step-line ${isStep3 ? 'active-line' : ''}"></div>
+                
+                <div class="text-center" style="width: 60px;">
+                    <div class="step-dot ${isStep3 ? 'active-green' : ''}">3</div>
+                    <div class="step-text">Siap</div>
+                </div>
+            </div>
+        </div>`;
+    });
 
-    if (alamatFull) {
-        // Membagi teks berdasarkan baris pertama (Nama) dan sisanya (Alamat)
-        const baris = alamatFull.split('\n'); 
-        
-        // Baris pertama masuk ke p_cust (Nama Customer)
-        if (pCust) pCust.innerText = baris[0].toUpperCase();
-
-        // Baris kedua dan seterusnya masuk ke p_alamat
-        if (pAlamat) {
-            if (baris.length > 1) {
-                // Mengambil baris 2 sampai terakhir, lalu digabung kembali dengan <br>
-                const sisaAlamat = baris.slice(1).join('<br>');
-                pAlamat.innerHTML = sisaAlamat; 
-            } else {
-                pAlamat.innerHTML = "-";
-            }
-        }
-    } else {
-        if (pCust) pCust.innerText = "-";
-        if (pAlamat) pAlamat.innerHTML = "-";
+    // Jika kosong, berikan pesan manis untuk customer
+    if (dataAktif.length === 0) {
+        container.innerHTML = '<div class="text-center py-5 text-muted">Belum ada pesanan aktif saat ini.</div>';
     }
 }
 
@@ -1583,7 +1953,6 @@ function sinkronkanInvoice() {
 
     // 1. Ambil data dasar dari input
     const noSJ = document.getElementById('sj_nomor')?.value || "-";
-    // PERBAIKAN DI SINI: Ambil dari input tanggal seperti di Surat Jalan
     const tglInput = document.getElementById('sj_tanggal')?.value;
     let tglTeks = "SIDOARJO, -";
     if (tglInput) {
@@ -1591,14 +1960,18 @@ function sinkronkanInvoice() {
         const daftarBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
         tglTeks = `SIDOARJO, ${d.getDate()} ${daftarBulan[d.getMonth()]} ${d.getFullYear()}`;
     }
-    const namaCust = document.getElementById('p_cust')?.innerText || "-";
-    const alamatCust = document.getElementById('p_alamat')?.innerHTML || "-";
+    const alamatCust = document.getElementById('sj_alamat')?.value || "-";
+    const namaCust = document.getElementById('p_cust')?.value|| "-";
+    
 
-    // 2. Filter barang yang berstatus SIAP (Step 3)
-    const itemsSiap = databaseBelanja.filter(item => item.step3 === true);
+    // 2. KUNCI PERBAIKAN: Filter barang yang SIAP (Step 3) DAN belum dikirim (status_sj pending)
+    const itemsSiap = databaseBelanja.filter(item => 
+        item.step3 === true && 
+        (item.status_sj === "pending" || item.status_sj === undefined)
+    );
     
     if (itemsSiap.length === 0) {
-        containerUtama.innerHTML = '<div class="text-center py-5">Belum ada barang siap kirim.</div>';
+        containerUtama.innerHTML = '<div class="text-center py-5 no-print">Belum ada barang siap kirim atau semua sudah diproses stok.</div>';
         return;
     }
 
@@ -1609,8 +1982,8 @@ function sinkronkanInvoice() {
         kumpulanHalaman.push(itemsSiap.slice(i, i + perHalaman));
     }
 
-    // 4. Bersihkan kontainer dan render ulang menggunakan struktur HTML asli kamu
-    containerUtama.innerHTML = ''; 
+    // 4. Bersihkan kontainer
+    containerUtama.innerHTML = '';
 
     kumpulanHalaman.forEach((halamanItems, index) => {
         let grandTotalHalaman = 0;
@@ -1633,7 +2006,7 @@ function sinkronkanInvoice() {
                 </tr>`;
         });
 
-        // Baris kosong agar tinggi tabel tetap konsisten (minimal 5 baris)
+        // Baris kosong
         for (let i = halamanItems.length; i < perHalaman; i++) {
             rowsHtml += `
                 <tr>
@@ -1645,7 +2018,7 @@ function sinkronkanInvoice() {
                 </tr>`;
         }
 
-        // Render struktur HTML asli kamu
+        // Render struktur HTML
         containerUtama.innerHTML += `
             <div class="halaman-invoice-print" style="${index > 0 ? 'page-break-before: always; margin-top: 20px;' : ''} width: 100%; color: #000; font-family: 'Arial', sans-serif; box-sizing: border-box; padding: 20px;">
                 
@@ -1654,22 +2027,22 @@ function sinkronkanInvoice() {
                         <div>
                             
                             <div style="font-size: 11px; line-height: 1.3;">
-                                <strong style="font-size: 14px;"></strong><br>
+                                <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
                                 Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
                                 wiwitdianasari@gmail.com | 0858 4347 4469
                             </div>
                         </div>
                     </div>
-                    <h4 style="margin: -150; font-weight: bold; text-decoration: underline; padding: 24px;">INVOICE</h4>
+                    <h4 style="margin: 0; font-weight: bold; text-decoration: underline; padding: 24px;">INVOICE</h4>
                     <div style="text-align: left;">
                         <div style="font-size: 16px; margin-top: 5px; font-weight: 600; padding: 8px; border: 2px solid #000;">
-                            INV. MG: <span>${noSJ}</span> 
+                            INV. MG: <span id="inv_noSJ">${noSJ}</span>
                         </div>
-                        <div style="font-weight: bold; font-size: 13px; margin-top: 15px;">${tglTeks}</div>
+                        <div id="inv_lokasi_tgl" style="font-weight: bold; font-size: 13px; margin-top: 15px;">${tglTeks}</div>
                         <div style="font-size: 13px; margin-top: 5px;">
                                 <strong>Kepada Yth.</strong><br>
-                                <span style="text-transform: uppercase; font-weight: bold;">${namaCust}</span><br>
-                                <div style="line-height: 1.2;">${alamatCust}</div>
+                                <span id="inv_cust" style="text-transform: uppercase; font-weight: bold;">${namaCust}</span><br>
+                                <div id="inv_alamat" style="line-height: 1.2;">${alamatCust}</div>
                             </div>
                     </div>
                 </div>
@@ -1684,13 +2057,13 @@ function sinkronkanInvoice() {
                             <th style="border: 1px solid #000; padding: 8px;">SUBTOTAL</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="listInvoice">
                         ${rowsHtml}
                     </tbody>
                     <tfoot>
                         <tr>
                             <td colspan="4" style="border: 1px solid #000; padding: 10px; text-align: right; font-weight: bold; font-size: 15px;">GRAND TOTAL HALAMAN INI :</td>
-                            <td style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold; font-size: 15px; background: #f9f9f9;">
+                            <td id="inv_grandTotal" style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold; font-size: 15px; background: #f9f9f9;">
                                 Rp ${grandTotalHalaman.toLocaleString('id-ID')}
                             </td>
                         </tr>
@@ -1745,57 +2118,66 @@ function copyToClipboardCustomer() {
 }
 
 
-// 3. Fungsi SIMPAN ARSIP
 async function arsipTransaksi() {
-    const noInv = document.getElementById('inv_noSJ').innerText;
-    const namaCust = document.getElementById('inv_cust').innerText;
-    const tglInv = document.getElementById('sj_tanggal').value; // Mengambil tanggal murni yyyy-mm-dd
-    const grandTotalTeks = document.getElementById('inv_grandTotal').innerText;
-    const grandTotal = parseInt(grandTotalTeks.replace(/[^0-9]/g, '')); // Ubah Rp 10.000 jadi 10000
-
-    if (namaCust === "-" || !tglInv) {
-        alert("Nama Customer dan Tanggal harus diisi sebelum simpan!");
-        return;
-    }
-
-    if (!confirm(`Simpan transaksi ${noInv} atas nama ${namaCust} ke riwayat penjualan?`)) return;
-
-    // 1. Kumpulkan daftar barang yang dibeli (Array)
-    const detailBarang = [];
-    databaseBelanja.forEach(item => {
-        if (item.step3 === true) {
-            detailBarang.push({
-                nama: item.nama,
-                qty: item.qtyBersih || item.jumlah,
-                satuan: item.satuan || 'KG',
-                harga: item.harga || 0,
-                subtotal: (item.qtyBersih || item.jumlah) * (item.harga || 0)
-            });
-        }
-    });
-
-    // 2. Siapkan Objek Data untuk Firebase
-    const dataPenjualan = {
-        nomor_invoice: noInv,
-        tanggal: tglInv,
-        customer: namaCust,
-        items: detailBarang,
-        total_omzet: grandTotal,
-        waktu_simpan: new Date().toISOString()
-    };
-
     try {
-        // 3. Simpan ke Firebase (Gunakan push untuk ID unik otomatis)
-        const refRiwayat = db.ref('Riwayat_Penjualan');
-        await refRiwayat.push(dataPenjualan);
+        // 1. Ambil data dasar (Tetap ambil untuk arsip, tapi tidak jadi syarat mati)
+        const inputTgl = document.getElementById('sj_tanggal');
+        const inputNo = document.getElementById('sj_nomor');
+        const previewCust = document.getElementById('p_cust'); 
+        const elGrandTotal = document.querySelector('#inv_grandTotal');
+
+        // Jika element tidak ditemukan, beri nilai default agar tidak error 'null'
+        const tglInv = inputTgl ? inputTgl.value : new Date().toISOString().split('T')[0];
+        const noInvManual = inputNo ? inputNo.value.trim() : "TANPA_NOMOR";
+        const namaCust = (previewCust && previewCust.innerText.trim() !== "-") ? previewCust.innerText.trim() : "CUSTOMER UMUM";
+        const grandTotalTeks = elGrandTotal ? elGrandTotal.innerText : "0";
+        
+        // Format Nomor Invoice (Hanya tambah MG jika ada input angka)
+        const noInvFinal = (noInvManual !== "" && !noInvManual.startsWith("MG")) ? `MG ${noInvManual}` : noInvManual;
+
+        // 2. VALIDASI MINIMAL (Hanya cek apakah ada barang yang dijual)
+        const grandTotal = parseInt(grandTotalTeks.replace(/[^0-9]/g, '')) || 0;
+        if (grandTotal === 0) {
+             return alert("⚠️ Gagal Simpan: Total belanja Rp 0. Pastikan sudah klik 'Segarkan Data'.");
+        }
+
+        if (!confirm(`Arsipkan transaksi ini ke Riwayat Penjualan?`)) return;
+
+        // 3. Kumpulkan daftar barang
+        const detailBarang = [];
+        const dataAktif = window.databaseBelanjaHarian || databaseBelanja;
+
+        dataAktif.forEach(item => {
+            if (item.step3 === true) {
+                const qty = parseFloat(item.qtyBersih || item.jumlah || 0);
+                const harga = parseFloat(item.harga || 0);
+                detailBarang.push({
+                    nama: item.nama.toUpperCase(),
+                    qty: qty,
+                    satuan: item.satuan || 'KG',
+                    harga: harga,
+                    subtotal: qty * harga
+                });
+            }
+        });
+
+        // 4. Kirim ke Firebase (Riwayat_Penjualan)
+        const dataPenjualan = {
+            nomor_invoice: noInvFinal,
+            tanggal: tglInv,
+            customer: namaCust, // Akan berisi "CUSTOMER UMUM" jika input kosong
+            items: detailBarang,
+            total_omzet: grandTotal,
+            waktu_simpan: new Date().toISOString()
+        };
+
+        await db.ref('Riwayat_Penjualan').push(dataPenjualan);
 
         alert("✅ Transaksi Berhasil Diarsipkan!");
         
-        // Opsional: Jika ingin membersihkan tampilan setelah simpan
-        // location.reload(); 
     } catch (error) {
-        console.error("Gagal simpan:", error);
-        alert("Gagal menyimpan transaksi ke database.");
+        console.error("Error Simpan:", error);
+        alert("Terjadi kesalahan teknis saat menyimpan.");
     }
 }
 
@@ -1806,6 +2188,13 @@ function updateHargaMaster(itemId, hargaPokok, markup) {
     const hp = parseFloat(hargaPokok) || 0;
     const mu = parseFloat(markup) || 0;
     const hargaJual = hp + mu;
+    const stokSekarang = Number(dataMaster.stok_tersedia || 0);
+    const qtyKeluar = Number(item.qtyBersih || 0);
+    const stokBaru = stokSekarang - qtyKeluar;
+
+    if (stokBaru < 0) {
+        console.warn(`Peringatan: Stok ${item.nama} akan menjadi negatif (${stokBaru})`);
+    }
 
     db.ref(`master_items/${itemId}`).update({
         harga_pokok: hp,
@@ -1817,84 +2206,29 @@ function updateHargaMaster(itemId, hargaPokok, markup) {
     });
 }
 
-function bukaModalHarga(id, nama, hp, mu) {
-    // 1. Set Judul
-    document.getElementById('modalTitle').innerText = `Update Harga: ${nama}`;
-    
-    // 2. Isi Konten Modal
-    document.getElementById('modalBodyContent').innerHTML = `
-        <div class="mb-3">
-            <label class="form-label fw-bold">Harga Pokok (Beli) - Rp</label>
-            <input type="number" id="edit_hp" class="form-control" value="${hp}" oninput="hitungEstJual()">
-        </div>
-        <div class="mb-3">
-            <label class="form-label fw-bold text-primary">Markup / Profit - Rp</label>
-            <input type="number" id="edit_mu" class="form-control" value="${mu}" oninput="hitungEstJual()">
-        </div>
-        <div class="p-3 bg-light border rounded">
-            <small class="text-muted d-block">Harga Jual Baru:</small>
-            <h4 class="text-success mb-0" id="est_jual_display">Rp ${(parseFloat(hp) + parseFloat(mu)).toLocaleString('id-ID')}</h4>
-        </div>
-    `;
 
-    // Fungsi lokal untuk update angka di modal secara live
-    window.hitungEstJual = function() {
-        const h = parseFloat(document.getElementById('edit_hp').value) || 0;
-        const m = parseFloat(document.getElementById('edit_mu').value) || 0;
-        document.getElementById('est_jual_display').innerText = `Rp ${(h + m).toLocaleString('id-ID')}`;
-    };
-
-    // 3. Munculkan Modal
-    const modalEl = document.getElementById('modalEditMaster');
-    const myModal = new bootstrap.Modal(modalEl);
-    myModal.show();
-
-    // 4. Aksi Tombol Simpan
-    document.getElementById('btnSimpanMaster').onclick = async function() {
-        const newHp = parseFloat(document.getElementById('edit_hp').value) || 0;
-        const newMu = parseFloat(document.getElementById('edit_mu').value) || 0;
-        const newHargaJual = newHp + newMu;
-
-        try {
-            // Update di tabel transaksi (belanja) agar invoice langsung berubah
-            await db.ref(`belanja/${id}`).update({
-                harga_pokok: newHp,
-                markup: newMu,
-                harga: newHargaJual
-            });
-            
-            myModal.hide();
-            // Opsional: Jika ingin update ke Master Item juga agar besok harga ini jadi default
-            // updateKeMaster(nama, newHp, newMu, newHargaJual); 
-        } catch (error) {
-            alert("Gagal update harga: " + error.message);
-        }
-    };
-}
-
-//FUNGSI POTONG STOCK
 async function prosesCetakDanPotongStok() {
-    // 1. Filter data dari memori browser
-    const itemsSiap = window.databaseBelanjaHarian.filter(item => 
-        item.tanggal === tglHariIni && 
+    const tglManual = document.getElementById('sj_tanggal')?.value;
+    const noSJManual = document.getElementById('sj_nomor')?.value;
+    const containerUtama = document.getElementById('area-cetak'); // Area yang berisi surat jalan
+
+    if (!tglManual || !noSJManual) {
+        return alert("Mohon isi Tanggal dan Nomor Surat Jalan di header terlebih dahulu!");
+    }
+
+    const itemsSiap = (window.databaseBelanjaHarian || []).filter(item => 
         item.step3 === true && 
-        item.statusAlur !== "Sudah Dikirim"
+        item.statusAlur !== "Sudah Dikirim" &&
+        (item.status_sj === "pending" || item.status_sj === undefined)
     );
 
     if (itemsSiap.length === 0) {
-        return alert("Tidak ada barang baru yang siap kirim untuk hari ini.");
+        return alert("Tidak ada barang 'SIAP' yang bisa diproses.");
     }
 
-    // --- LOGIKA PENOMORAN HARDCODE MG 01426 [COUNTER] ---
-    const kodeTetap = "01426"; 
-    const urutanFormat = window.counterSJ.toString().padStart(2, '0'); // Pastikan 2 digit (20, 21, dst)
-    
-    // Hasil: MG 01426 20
-    const noSJ = `MG ${kodeTetap} ${urutanFormat}`;
-    
-    // Simpan nomor urut berikutnya ke memori agar tidak reset saat F5
-    window.counterSJ++; 
-    localStorage.setItem('last_counter_sj', window.counterSJ);
+    // --- KUNCI: SIMPAN HTML AREA CETAK SEKARANG ---
+    // Kita simpan tampilan yang saat ini ada di layar ke variabel agar tidak hilang saat data diupdate
+    const htmlLama = containerUtama.innerHTML;
 
     try {
         const updates = {};
@@ -1904,11 +2238,7 @@ async function prosesCetakDanPotongStok() {
         const waktuSkrg = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
 
         for (const item of itemsSiap) {
-            if (!item.idMaster || item.idMaster === "-") {
-                console.warn(`Skipping ${item.nama}: ID Master Kosong`);
-                continue;
-            }
-
+            if (!item.idMaster || item.idMaster === "-") continue;
             const masterPath = `master_items/${item.idMaster}`;
             const snapshot = await db.ref(masterPath).get();
 
@@ -1916,56 +2246,45 @@ async function prosesCetakDanPotongStok() {
                 const dataMaster = snapshot.val();
                 const stokSekarang = Number(dataMaster.stok_tersedia || 0);
                 const qtyKeluar = Number(item.qtyBersih || 0);
-                const stokBaru = stokSekarang - qtyKeluar;
-
-                // A. Update Stok di Gudang Master
-                updates[`${masterPath}/stok_tersedia`] = stokBaru;
                 
-                // B. Update Status di Database Belanja
+                updates[`${masterPath}/stok_tersedia`] = stokSekarang - qtyKeluar;
                 updates[`belanja/${item.id}/statusAlur`] = "Sudah Dikirim"; 
+                updates[`belanja/${item.id}/status_sj`] = "dikirim";
                 updates[`belanja/${item.id}/stokSudahDipotong`] = true;
-                updates[`belanja/${item.id}/noSJ`] = noSJ;
+                updates[`belanja/${item.id}/noSJ`] = noSJManual;
+                updates[`belanja/${item.id}/tanggalKirimAktual`] = tglManual; 
                 updates[`belanja/${item.id}/idPengiriman`] = idPengiriman;
 
-                // C. Catat Detail ke History (Items)
                 updates[`history_pengiriman/${idPengiriman}/items/${item.id}`] = {
-                    nama: item.nama,
-                    qty: qtyKeluar,
-                    idMaster: item.idMaster,
-                    idBelanja: item.id
+                    nama: item.nama, qty: qtyKeluar, idMaster: item.idMaster, idBelanja: item.id
                 };
-
-                // Update Memori Lokal
-                const idx = window.databaseBelanjaHarian.findIndex(d => d.id === item.id);
-                if (idx !== -1) {
-                    window.databaseBelanjaHarian[idx].statusAlur = "Sudah Dikirim";
-                }
             }
         }
 
-        // D. Catat Header History dengan Nomor SJ yang sudah di-generate
         updates[`history_pengiriman/${idPengiriman}/header`] = {
-            no_surat_jalan: noSJ,
-            tanggal_kirim: tglHariIni,
-            waktu_proses: waktuSkrg,
-            total_item: itemsSiap.length
+            no_surat_jalan: noSJManual, tanggal_kirim: tglManual, waktu_proses: waktuSkrg, total_item: itemsSiap.length
         };
 
-        // EKSEKUSI KE FIREBASE
+        // Jalankan Update
         await db.ref().update(updates);
         
-        alert(`Berhasil! Stok dipotong & SJ ${noSJ} tersimpan.`);
+        // --- KUNCI: PAKSA HTML TETAP ADA ---
+        // Walaupun Firebase sudah mengosongkan data, kita tempel kembali HTML yang sudah kita simpan tadi
+        containerUtama.innerHTML = htmlLama;
+
+        alert(`Berhasil! Klik OK untuk mulai mencetak.`);
         
-        // 2. RE-RENDER & PRINT
+        // Cetak
+        window.print();
+
+        // Setelah print selesai, baru bersihkan secara alami
         if (typeof renderPreviewSuratJalan === "function") {
             renderPreviewSuratJalan();
         }
-        
-        setTimeout(() => { window.print(); }, 800);
 
     } catch (error) {
         console.error("Gagal Update Firebase:", error);
-        alert("Terjadi kesalahan sistem. Cek Console F12.");
+        alert("Terjadi kesalahan sistem.");
     }
 }
 
@@ -2270,6 +2589,7 @@ function renderUlangSuratJalan(data, container) {
     });
 }
 
+
 // Jalankan otomatis saat halaman selesai loading
 document.addEventListener('DOMContentLoaded', () => {
     // Beri jeda 1 detik agar Firebase siap
@@ -2280,6 +2600,143 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 1000);
 });
+
+function renderUlangInvoice(data, container) {
+    if (!data) return;
+
+    // --- 1. PENYESUAIAN PENGAMBILAN DATA (Langsung dari root data) ---
+    // Karena di Riwayat_Penjualan tidak ada property .header
+    let noSJFinal = data.nomor_invoice || "-";
+    
+    // Logika penomoran (Identik dengan kode Anda)
+    if (noSJFinal.length > 12) {
+        const cleanNumber = noSJFinal.replace('SJ-', '');
+        noSJFinal = 'MG-' + cleanNumber.substring(cleanNumber.length - 5);
+    } else {
+        noSJFinal = noSJFinal.replace('SJ-', 'MG-').replace('SJ', 'MG');
+    }
+
+    // Ambil data sejajar dengan nomor_invoice
+    const tglInput = data.tanggal || "";
+    const namaCust = data.customer || "PELANGGAN UMUM";
+    const alamatCust = data.alamat || "SIDOARJO / SURABAYA";
+
+    // --- 2. LOGIKA TANGGAL ---
+    let tglTeks = "-";
+    if (tglInput) {
+        const d = new Date(tglInput);
+        const daftarBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+        tglTeks = `SIDOARJO, ${d.getDate()} ${daftarBulan[d.getMonth()]} ${d.getFullYear()}`;
+    }
+
+    // --- 3. AMBIL ITEMS ---
+    const itemsRaw = data.items || {};
+    const itemsSiap = Object.values(itemsRaw);
+
+    // --- 4. LOGIKA PAGING ---
+    const perHalaman = 5;
+    const kumpulanHalaman = [];
+    for (let i = 0; i < itemsSiap.length; i += perHalaman) {
+        kumpulanHalaman.push(itemsSiap.slice(i, i + perHalaman));
+    }
+
+    container.innerHTML = '';
+    
+    kumpulanHalaman.forEach((halamanItems, index) => {
+        const hlmKe = index + 1;
+        const totalHlm = kumpulanHalaman.length;
+        let rowsHtml = '';
+        let grandTotalHalaman = 0;
+
+        halamanItems.forEach((item, idx) => {
+            const noUrut = (index * perHalaman) + (idx + 1);
+            const qty = parseFloat(item.qty || 0);
+            const harga = parseFloat(item.harga || 0); // Ambil harga dari Firebase
+            const subtotal = item.subtotal || (qty * harga);
+            grandTotalHalaman += subtotal;
+
+            rowsHtml += `
+                <tr>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: center;">${noUrut}</td>
+                    <td style="border: 1px solid #000; padding: 8px 12px; text-transform: uppercase;">${item.nama}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: center;">${qty} ${item.satuan || 'KG'}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right;">Rp ${harga.toLocaleString('id-ID')}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right;">Rp ${subtotal.toLocaleString('id-ID')}</td>
+                </tr>`;
+        });
+
+        // Baris kosong
+        for (let i = halamanItems.length; i < perHalaman; i++) {
+            rowsHtml += `<tr><td style="border: 1px solid #000; padding: 18px;">&nbsp;</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
+        }
+
+        // --- 5. RENDER LAYOUT INVOICE (Identik dengan tampilan SJ tapi kolom Invoice) ---
+        container.innerHTML += `
+            <div class="halaman-invoice-print" style="${index > 0 ? 'page-break-before: always;' : ''} width: 100%; color: #000; font-family: Arial, sans-serif; background: white; padding: 25px; box-sizing: border-box;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                    <div style="flex: 1;">
+                        <img src="Logo.png" alt="Logo" style="height: 100px; object-fit: contain; margin-bottom: 5px;">
+                        <div style="font-size: 11px; line-height: 1.3;">
+                            <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
+                            Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
+                            wiwitdianasari@gmail.com | 0858 4347 4469
+                        </div>
+                    </div>
+
+                    <div style="flex: 1; text-align: center; padding-top: 10px;">
+                        <h3 style="margin: 0; font-weight: bold; text-decoration: underline; font-size: 20px; letter-spacing: 2px;">INVOICE</h3>
+                        <small style="font-size: 11px;">Halaman ${hlmKe} dari ${totalHlm}</small>
+                    </div>
+
+                    <div style="flex: 1; display: flex; justify-content: flex-end;">
+                        <div style="text-align: left; min-width: 200px;">
+                            <div style="font-size: 16px; font-weight: bold; padding: 8px; border: 2.5px solid #000; margin-bottom: 10px; text-align: center;">
+                                NO. MG: ${noSJFinal}
+                            </div>
+                            <div style="font-weight: bold; font-size: 13px;">${tglTeks}</div>
+                            <div style="font-size: 13px; margin-top: 5px;">
+                                <strong>Kepada Yth.</strong><br>
+                                <span style="text-transform: uppercase; font-weight: bold;">${namaCust}</span><br>
+                                <div style="line-height: 1.2;">${alamatCust}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 13px; margin-top: 30px;">
+                    <thead>
+                        <tr style="text-align: center; background-color: #f2f2f2;">
+                            <th style="border: 1px solid #000; padding: 10px; width: 50px;">NO</th>
+                            <th style="border: 1px solid #000; padding: 10px;">NAMA BARANG</th>
+                            <th style="border: 1px solid #000; padding: 10px; width: 100px;">JUMLAH</th>
+                            <th style="border: 1px solid #000; padding: 10px; width: 120px;">HARGA</th>
+                            <th style="border: 1px solid #000; padding: 10px; width: 120px;">SUBTOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                    <tfoot>
+                        <tr style="font-weight: bold; background: #f9f9f9;">
+                            <td colspan="4" style="border: 1px solid #000; padding: 10px; text-align: right;">GRAND TOTAL :</td>
+                            <td style="border: 1px solid #000; padding: 10px; text-align: right;">Rp ${grandTotalHalaman.toLocaleString('id-ID')}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div style="margin-top: 15px; font-size: 11px;">
+                    <strong>Pembayaran via Transfer:</strong> BCA 0123456789 a/n Wiwit Diana Sari
+                </div>
+
+                <table style="width: 100%; margin-top: 30px; text-align: center; font-size: 13px; border: none !important;">
+                    <tr>
+                        <td style="border: none !important; width: 33%;">Dibuat Oleh,<br><br><br><br>( <strong>Firman Agung</strong> )</td>
+                        <td style="border: none !important; width: 33%;">Diperiksa Oleh,<br><br><br><br>( <strong>Wiwit Diana Sari</strong> )</td>
+                        <td style="border: none !important; width: 33%;">Penerima,<br><br><br><br>( .......................... )</td>
+                    </tr>
+                </table>
+            </div>`;
+    });
+}
 
 function cetakHistoriSJ() {
     // 1. Ambil konten HTML yang sudah di-render oleh JS kamu

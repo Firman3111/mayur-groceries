@@ -386,3 +386,22 @@ h1, h2, h3, .fw-bold {
     background-color: #198754 !important;
     box-shadow: 0 4px 10px rgba(25, 135, 84, 0.2);
 }
+
+@media print {
+    /* Memaksa kontainer memanjang mengikuti isi tabel */
+    .area-cetak-jurnal {
+        height: auto !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+    
+    /* Sembunyikan elemen yang tidak perlu agar tidak makan tempat */
+    .no-print, .btn, .filter-area {
+        display: none !important;
+    }
+
+    /* Sembunyikan elemen yang tidak perlu */
+    .no-print, .btn, .filter-area {
+        display: none !important;
+    }
+}
