@@ -99,7 +99,7 @@ function generatePrintTemplate(type, data, index, totalHlm, hlmItems) {
             rowsHtml += `
                 <tr style="font-size: ${PRINT_SETTINGS.fontDasar};">
                     <td style="border: 1px solid #000; padding: 2px; text-align: center;">${noUrut}</td>
-                    <td style="border: 1px solid #000; padding: 2px 8px; font-weight: bold;">${item.nama.toUpperCase()}</td>
+                    <td style="border: 1px solid #000; padding: 2px 8px; font-weight: bold;">${(item && item.nama) ? item.nama.toUpperCase() : "ITEM TANPA NAMA"}</td>
                     <td style="border: 1px solid #000; padding: 2px; text-align: center;">${qty}</td>
                     <td style="border: 1px solid #000; padding: 2px 5px; text-align: right;">${harga.toLocaleString('id-ID')}</td>
                     <td style="border: 1px solid #000; padding: 2px 5px; text-align: right; font-weight: bold;">${subtotal.toLocaleString('id-ID')}</td>
@@ -391,7 +391,7 @@ function bukaModalHarga(id, nama, hargaPokok, markup) {
     modalEdit.show();
 }
 
-// 2. Fungsi Hitung Otomatis (Logika Persen vs Nominal)
+/// --- FUNGSI 1: HITUNG HARGA REAL-TIME ---
 function hitungHargaFinal() {
     const hp = parseFloat(document.getElementById('editHargaPokok').value) || 0;
     const markup = parseFloat(document.getElementById('editNilaiMarkup').value) || 0;
@@ -404,29 +404,103 @@ function hitungHargaFinal() {
         total = hp + markup;
     }
 
-    // Update tampilan Rp di kotak biru modal
-    document.getElementById('displayHargaFinal').innerText = "Rp " + Math.round(total).toLocaleString('id-ID');
-    return Math.round(total);
+    const hargaBulat = Math.round(total);
+
+    // Update tampilan di kotak biru modal
+    const displayElem = document.getElementById('displayHargaFinal');
+    if (displayElem) {
+        displayElem.innerText = "Rp " + hargaBulat.toLocaleString('id-ID');
+    }
+    
+    return hargaBulat;
 }
 
-// 3. Fungsi Simpan (Eksekusi ke Firebase)
-function simpanPerubahanHarga() {
+// --- FUNGSI 2: SIMPAN & SINKRONISASI KE SEMUA TABEL ---
+async function simpanPerubahanHarga() {
     const id = document.getElementById('editItemId').value;
+    const namaBarang = document.getElementById('editItemNama').value; // Mengambil nama untuk sinkronisasi
     const hp = parseFloat(document.getElementById('editHargaPokok').value) || 0;
     const markup = parseFloat(document.getElementById('editNilaiMarkup').value) || 0;
-    const hargaFinal = hitungHargaFinal(); // Ambil harga hasil perhitungan
+    const tipe = document.getElementById('editTipeMarkup').value;
+    
+    const hargaFinal = hitungHargaFinal();
 
-    db.ref("belanja/" + id).update({
-        harga_pokok: hp,
-        markup: markup,
-        harga: hargaFinal 
-    }).then(() => {
-        // Tutup modal
+    if (!id) return alert("Gagal: ID tidak ditemukan!");
+
+    try {
+        // --- PROSES A: Update di Halaman Operasional (belanja) ---
+        await db.ref("belanja/" + id).update({
+            harga_pokok: hp,
+            markup: markup,
+            tipe_markup: tipe,
+            harga: hargaFinal 
+        });
+
+        // --- PROSES B: Sinkronisasi ke Riwayat_Penjualan (Agar Jurnal Update) ---
+        const snapRiwayat = await db.ref("Riwayat_Penjualan").once("value");
+        if (snapRiwayat.exists()) {
+            let updatesRiwayat = {};
+            const namaCari = namaBarang.trim().toLowerCase(); // Normalisasi nama yang dicari
+
+            snapRiwayat.forEach(invoice => {
+                const invData = invoice.val();
+                if (invData.items) {
+                    // Kita loop items di setiap invoice
+                    invData.items.forEach((item, index) => {
+                        const namaItemRiwayat = (item.nama || "").trim().toLowerCase(); // Normalisasi nama di database
+                        
+                        if (namaItemRiwayat === namaCari) {
+                            // Gunakan path lengkap ke field yang mau diubah
+                            const pathBase = `Riwayat_Penjualan/${invoice.key}/items/${index}`;
+                            
+                            updatesRiwayat[`${pathBase}/harga_pokok`] = hp;
+                            updatesRiwayat[`${pathBase}/markup`] = markup;
+                            updatesRiwayat[`${pathBase}/tipe_markup`] = tipe;
+                            updatesRiwayat[`${pathBase}/harga`] = hargaFinal;
+                            
+                            // Hitung ulang sub_total (Tagihan)
+                            const qty = parseFloat(item.qty || item.jumlah || 0);
+                            updatesRiwayat[`${pathBase}/sub_total`] = qty * hargaFinal;
+                        }
+                    });
+                }
+            });
+
+            if (Object.keys(updatesRiwayat).length > 0) {
+                console.log("Mengupdate Riwayat:", updatesRiwayat);
+                await db.ref().update(updatesRiwayat);
+            } else {
+                console.warn("Tidak ditemukan item yang cocok di Riwayat_Penjualan untuk nama:", namaBarang);
+            }
+        }
+
+        // --- PROSES C: Sinkronisasi ke Master Item (Agar permanen kedepannya) ---
+        const snapMaster = await db.ref("master_items").once("value");
+        if (snapMaster.exists()) {
+            let updatesMaster = {};
+            snapMaster.forEach(child => {
+                if (child.val().nama === namaBarang) {
+                    updatesMaster[`master_items/${child.key}/hargaBeli`] = hp;
+                }
+            });
+            if (Object.keys(updatesMaster).length > 0) await db.ref().update(updatesMaster);
+        }
+
+        // --- FEEDBACK & TUTUP MODAL ---
+        alert("✅ Berhasil! Harga telah disinkronkan ke Operasional, Jurnal, dan Master.");
+        
         const modalEl = document.getElementById('modalEditHarga');
         const modalInstance = bootstrap.Modal.getInstance(modalEl);
-        modalInstance.hide();
-        console.log("Update Sukses!");
-    }).catch((err) => alert("Gagal: " + err.message));
+        if (modalInstance) modalInstance.hide();
+
+        // Refresh tabel (Sesuaikan dengan nama fungsi refresh Anda)
+        if (typeof loadTabelBelanja === 'function') loadTabelBelanja();
+        if (typeof jalankanFilterJurnal === 'function') jalankanFilterJurnal();
+
+    } catch (err) {
+        console.error(err);
+        alert("Gagal Sinkronisasi: " + err.message);
+    }
 }
 
 
@@ -2114,64 +2188,72 @@ function copyToClipboardCustomer() {
 
 async function arsipTransaksi() {
     try {
-        // 1. Ambil data dasar (Tetap ambil untuk arsip, tapi tidak jadi syarat mati)
         const inputTgl = document.getElementById('sj_tanggal');
         const inputNo = document.getElementById('sj_nomor');
         const previewCust = document.getElementById('p_cust'); 
-        const elGrandTotal = document.querySelector('#inv_grandTotal');
 
-        // Jika element tidak ditemukan, beri nilai default agar tidak error 'null'
         const tglInv = inputTgl ? inputTgl.value : new Date().toISOString().split('T')[0];
         const noInvManual = inputNo ? inputNo.value.trim() : "TANPA_NOMOR";
-        const namaCust = (previewCust && previewCust.innerText.trim() !== "-") ? previewCust.innerText.trim() : "CUSTOMER UMUM";
-        const grandTotalTeks = elGrandTotal ? elGrandTotal.innerText : "0";
-        
-        // Format Nomor Invoice (Hanya tambah MG jika ada input angka)
         const noInvFinal = (noInvManual !== "" && !noInvManual.startsWith("MG")) ? `MG ${noInvManual}` : noInvManual;
+        const namaCust = (previewCust && previewCust.innerText.trim() !== "-") ? previewCust.innerText.trim() : "CUSTOMER UMUM";
 
-        // 2. VALIDASI MINIMAL (Hanya cek apakah ada barang yang dijual)
-        const grandTotal = parseInt(grandTotalTeks.replace(/[^0-9]/g, '')) || 0;
-        if (grandTotal === 0) {
-             return alert("⚠️ Gagal Simpan: Total belanja Rp 0. Pastikan sudah klik 'Segarkan Data'.");
-        }
-
-        if (!confirm(`Arsipkan transaksi ini ke Riwayat Penjualan?`)) return;
-
-        // 3. Kumpulkan daftar barang
+        // --- VALIDASI & PENGAMBILAN DATA BARANG ---
         const detailBarang = [];
+        let hitungGrandTotal = 0;
         const dataAktif = window.databaseBelanjaHarian || databaseBelanja;
 
         dataAktif.forEach(item => {
-            if (item.step3 === true) {
+            // Filter hanya item yang siap kirim (step3) dan belum di-SJ
+            if (item.step3 === true && (item.status_sj === "pending" || item.status_sj === undefined)) {
                 const qty = parseFloat(item.qtyBersih || item.jumlah || 0);
                 const harga = parseFloat(item.harga || 0);
-                detailBarang.push({
-                    nama: item.nama.toUpperCase(),
-                    qty: qty,
-                    satuan: item.satuan || 'KG',
-                    harga: harga,
-                    subtotal: qty * harga
-                });
+                const sub = qty * harga;
+
+                if (qty > 0 && harga > 0) {
+                    detailBarang.push({
+                        nama: item.nama.toUpperCase(),
+                        qty: qty,
+                        satuan: item.satuan || 'KG',
+                        harga: harga,
+                        harga_pokok: item.harga_pokok || 0, // Tambahkan ini agar jurnal lengkap
+                        markup: item.markup || 0,
+                        tipe_markup: item.tipe_markup || "nominal",
+                        subtotal: sub,
+                        sub_total: sub
+                    });
+                    hitungGrandTotal += sub;
+                }
             }
         });
 
-        // 4. Kirim ke Firebase (Riwayat_Penjualan)
+        // CEK APAKAH TOTALNYA 0
+        if (hitungGrandTotal === 0 || detailBarang.length === 0) {
+             return alert("⚠️ Gagal Simpan: Total belanja Rp 0.\nPastikan item sudah di-check (Step 3) dan harga sudah muncul.");
+        }
+
+        if (!confirm(`Arsipkan transaksi senilai Rp ${hitungGrandTotal.toLocaleString('id-ID')} ini?`)) return;
+
+        // --- SIMPAN KE FIREBASE ---
         const dataPenjualan = {
             nomor_invoice: noInvFinal,
             tanggal: tglInv,
-            customer: namaCust, // Akan berisi "CUSTOMER UMUM" jika input kosong
+            customer: namaCust,
             items: detailBarang,
-            total_omzet: grandTotal,
-            waktu_simpan: new Date().toISOString()
+            total_omzet: hitungGrandTotal,
+            waktu_simpan: new Date().toISOString(),
+            status: "arsip"
         };
 
         await db.ref('Riwayat_Penjualan').push(dataPenjualan);
 
         alert("✅ Transaksi Berhasil Diarsipkan!");
         
+        // Optional: Bersihkan databaseBelanja setelah simpan agar tidak dobel
+        // location.reload(); 
+
     } catch (error) {
         console.error("Error Simpan:", error);
-        alert("Terjadi kesalahan teknis saat menyimpan.");
+        alert("Kesalahan teknis: " + error.message);
     }
 }
 
@@ -2567,76 +2649,233 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1000);
 });
 
-async function updateDataPenjualan() {
-    const id = window.HistoriApp.idTerpilih;
-    const indexItem = document.getElementById('edit-item-index').value;
-    const hargaBaru = parseFloat(document.getElementById('edit-harga-baru').value);
+async function updateDataPenjualan(event) {
+    if (event) event.preventDefault();
 
-    if (!id || indexItem === "" || isNaN(hargaBaru)) {
-        alert("Pilih item dan masukkan harga yang valid!");
-        return;
+    const id = window.HistoriApp?.idTerpilih; 
+    const elSelect = document.getElementById('edit-item-index');
+    
+    // 1. Ambil Nama Barang dan Bersihkan dari teks harga (Rp...)
+    let namaLengkap = elSelect ? elSelect.options[elSelect.selectedIndex].text : "";
+    const namaBarangDipilih = namaLengkap.split(' (')[0].trim();
+    
+    if (!id || !namaBarangDipilih || namaBarangDipilih === "" || namaBarangDipilih === "Pilih Item...") {
+        return alert("Pilih barang terlebih dahulu!");
     }
 
     try {
-        // 1. Ambil data pengiriman untuk mendapatkan No SJ
-        const snapKirim = await db.ref(`history_pengiriman/${id}`).once('value');
-        const dataKirim = snapKirim.val();
-        if (!dataKirim) return;
-
-        const noSJ = dataKirim.header?.no_surat_jalan || "";
-        
-        // --- LOGIKA SINKRONISASI FORMAT (PENTING!) ---
+        // --- PREPARASI DATA ---
+        const snapHeader = await db.ref(`history_pengiriman/${id}/header`).once('value');
+        const noSJ = snapHeader.val()?.no_surat_jalan || "";
         let targetInvoice = noSJ.includes('SJ-') ? noSJ.replace('SJ-', 'MG ') : "MG " + noSJ;
         targetInvoice = targetInvoice.trim();
 
-        // 2. Cari Key di Riwayat_Penjualan
-        const snapSemuaJual = await db.ref(`Riwayat_Penjualan`).once('value');
-        const semuaPenjualan = snapSemuaJual.val();
+        // Ambil Nilai Input
+        const modalBaru = parseFloat(document.getElementById('edit-modal-baru').value) || 0;
+        const markupBaru = parseFloat(document.getElementById('edit-markup-baru').value) || 0;
+        const tipeBaru = document.getElementById('edit-tipe-baru').value;
         
-        const findKey = Object.keys(semuaPenjualan || {}).find(key => 
-            semuaPenjualan[key].nomor_invoice === targetInvoice
-        );
-
-        if (findKey) {
-            // 3. Ambil item lama untuk hitung subtotal baru
-            const itemLama = semuaPenjualan[findKey].items[indexItem];
-            if (!itemLama) {
-                alert("Item tidak ditemukan di data penjualan!");
-                return;
-            }
-
-            const qty = parseFloat(itemLama.qty || 0);
-            const subtotalBaru = qty * hargaBaru;
-
-            // 4. Update ke Firebase (Gunakan sub_total sesuai database Anda)
-            const updatePath = `Riwayat_Penjualan/${findKey}/items/${indexItem}`;
-            await db.ref(updatePath).update({
-                harga: hargaBaru,
-                sub_total: subtotalBaru
-            });
-
-            // 5. Feedback & Render Ulang
-            const statusLabel = document.getElementById('status-update');
-            if (statusLabel) {
-                statusLabel.style.display = 'block';
-                setTimeout(() => { statusLabel.style.display = 'none'; }, 3000);
-            }
-            
-            alert("Harga berhasil diperbarui!");
-            
-            // Render ulang preview agar harga baru langsung terlihat
-            renderPreviewHistori(id); 
-
-            // Kosongkan input harga setelah sukses
-            document.getElementById('edit-harga-baru').value = "";
+        // PENGAMAN HARGA: Hitung manual di sini agar tidak 0
+        let hargaJualFinal = 0;
+        if (tipeBaru === "persen") {
+            hargaJualFinal = modalBaru + (modalBaru * (markupBaru / 100));
         } else {
-            alert("Gagal: Data Riwayat_Penjualan dengan nomor " + targetInvoice + " tidak ditemukan.");
+            hargaJualFinal = modalBaru + markupBaru;
         }
 
+        if (hargaJualFinal <= 0) {
+            return alert("Gagal: Harga jual tidak boleh 0. Periksa Modal dan Markup!");
+        }
+
+        let updates = {};
+        let itemHistoriKetemu = false;
+        let itemJurnalKetemu = false;
+
+        // --- A. UPDATE OPERASIONAL (history_pengiriman) ---
+        // Cari berdasarkan NAMA di dalam items untuk menghindari "Index Undefined"
+        const snapHistori = await db.ref(`history_pengiriman/${id}/items`).once('value');
+        if (snapHistori.exists()) {
+            snapHistori.forEach(child => {
+                const itemH = child.val();
+                if (itemH && itemH.nama && itemH.nama.trim() === namaBarangDipilih) {
+                    const pathH = `history_pengiriman/${id}/items/${child.key}`;
+                    updates[`${pathH}/harga_pokok`] = modalBaru;
+                    updates[`${pathH}/markup`] = markupBaru;
+                    updates[`${pathH}/tipe_markup`] = tipeBaru;
+                    updates[`${pathH}/harga`] = hargaJualFinal;
+                    
+                    const qtyH = parseFloat(itemH.qty || 0);
+                    updates[`${pathH}/sub_total`] = qtyH * hargaJualFinal;
+                    itemHistoriKetemu = true;
+                }
+            });
+        }
+
+        // --- B. UPDATE JURNAL (Riwayat_Penjualan) ---
+        const snapJurnal = await db.ref("Riwayat_Penjualan").once("value");
+        snapJurnal.forEach(inv => {
+            const d = inv.val();
+            if (d.nomor_invoice === targetInvoice && d.items) {
+                // Konversi items ke array jika ternyata formatnya object
+                const itemsArray = Array.isArray(d.items) ? d.items : Object.values(d.items);
+                
+                itemsArray.forEach((item, index) => {
+                    if (item && item.nama && item.nama.trim() === namaBarangDipilih) {
+                        // Pastikan path menggunakan key asli jika d.items adalah object
+                        const itemKey = Array.isArray(d.items) ? index : Object.keys(d.items)[index];
+                        const pathJ = `Riwayat_Penjualan/${inv.key}/items/${itemKey}`;
+                        
+                        updates[`${pathJ}/harga_pokok`] = modalBaru;
+                        updates[`${pathJ}/markup`] = markupBaru;
+                        updates[`${pathJ}/tipe_markup`] = tipeBaru;
+                        updates[`${pathJ}/harga`] = hargaJualFinal;
+                        
+                        const qty = parseFloat(item.qty || 0);
+                        updates[`${pathJ}/sub_total`] = qty * hargaJualFinal;
+                        updates[`${pathJ}/subtotal`] = qty * hargaJualFinal;
+                        itemJurnalKetemu = true;
+                    }
+                });
+            }
+        });
+
+        // --- C. SINKRON KE MASTER ITEMS ---
+        const snapMaster = await db.ref("master_items").once("value");
+        if (snapMaster.exists()) {
+            snapMaster.forEach(m => {
+                const namaMaster = m.val().nama?.toString().trim().toLowerCase();
+                const namaDicari = namaBarangDipilih.toLowerCase();
+                if (namaMaster === namaDicari) {
+                    updates[`master_items/${m.key}/hargaBeli`] = modalBaru;
+                }
+            });
+        }
+
+        // --- D. SINKRON KE NODE BELANJA (OPERASIONAL HARIAN) ---
+        const snapBelanja = await db.ref("belanja").once("value");
+        if (snapBelanja.exists()) {
+            snapBelanja.forEach(b => {
+                const itemB = b.val();
+                
+                // Cari barang yang namanya sama (Case Insensitive & Trim)
+                if (itemB && itemB.nama && itemB.nama.trim().toLowerCase() === namaBarangDipilih.toLowerCase()) {
+                    const pathB = `belanja/${b.key}`;
+                    
+                    // Update field sesuai struktur database Mas
+                    updates[`${pathB}/harga`] = hargaJualFinal;
+                    updates[`${pathB}/harga_pokok`] = modalBaru;
+                    updates[`${pathB}/markup`] = markupBaru;
+                    updates[`${pathB}/tipe_markup`] = tipeBaru; // Sudah diperbaiki dari pathH ke pathB
+
+                    // Hitung subtotal berdasarkan qtyBersih (Struktur Mas menggunakan qtyBersih)
+                    const qtyB = parseFloat(itemB.qtyBersih || itemB.jumlah || 0);
+                    if (qtyB > 0) {
+                        updates[`${pathB}/subtotal`] = qtyB * hargaJualFinal;
+                    }
+                    
+                    console.log(`Menyiapkan update untuk belanja ID: ${b.key}`);
+                }
+            });
+        }
+
+        // --- VALIDASI AKHIR & EKSEKUSI ---
+        if (!itemHistoriKetemu && !itemJurnalKetemu) {
+            return alert("Barang tidak ditemukan di data manapun. Cek kembali nama barang.");
+        }
+
+        await db.ref().update(updates);
+        
+        alert("✅ Berhasil Update!\n- Operasional & Jurnal Sinkron\n- Master Item Terupdate");
+        
+        // Render ulang dengan jeda agar Firebase selesai proses
+        setTimeout(() => {
+            if (typeof renderPreviewHistori === 'function') {
+                renderPreviewHistori(id);
+            }
+        }, 500);
+
     } catch (err) {
-        console.error("Gagal update:", err);
-        alert("Gagal memperbarui data: " + err.message);
+        console.error(err);
+        alert("Terjadi kesalahan: " + err.message);
     }
+}
+
+function isiDropdownItemHistori(id) {
+    const select = document.getElementById('edit-item-index');
+    if (!select) return;
+
+    db.ref(`history_pengiriman/${id}/items`).once('value', snap => {
+        select.innerHTML = '<option value="">Pilih Item...</option>';
+        snap.forEach((child) => {
+            const data = child.val();
+            // Paksa value menggunakan data.nama
+            const nama = data.nama;
+            let opt = document.createElement('option');
+            opt.value = nama; // SANGAT PENTING: Isinya harus Nama, bukan 0
+            opt.text = nama;
+            select.appendChild(opt);
+        });
+        console.log("Dropdown terisi untuk ID:", id);
+    });
+}
+
+
+
+async function sinkronkanInputEditHistori() {
+    const id = window.HistoriApp?.idTerpilih; 
+    const elSelect = document.getElementById('edit-item-index');
+    // Sama seperti di atas, kita ambil Nama-nya
+    const namaBarang = elSelect ? elSelect.options[elSelect.selectedIndex].text : "";
+    
+    if (!id || !namaBarang || namaBarang === "Pilih Item...") return;
+
+    try {
+        // Cari datanya di Riwayat_Penjualan berdasarkan Nama
+        const snapHeader = await db.ref(`history_pengiriman/${id}/header`).once('value');
+        const noSJ = snapHeader.val()?.no_surat_jalan || "";
+        let targetInv = noSJ.includes('SJ-') ? noSJ.replace('SJ-', 'MG ') : "MG " + noSJ;
+
+        const snapJurnal = await db.ref("Riwayat_Penjualan").once("value");
+        snapJurnal.forEach(inv => {
+            if (inv.val().nomor_invoice === targetInv.trim() && inv.val().items) {
+                const item = inv.val().items.find(it => it.nama === namaBarang);
+                if (item) {
+                    document.getElementById('edit-modal-baru').value = item.harga_pokok || 0;
+                    document.getElementById('edit-markup-baru').value = item.markup || 0;
+                    document.getElementById('edit-tipe-baru').value = item.tipe_markup || "nominal";
+                    hitungHargaHistori(); // Update label harga di tombol
+                }
+            }
+        });
+    } catch (e) { console.error(e); }
+}
+
+
+function hitungHargaHistori() {
+    const hpInput = document.getElementById('edit-modal-baru');
+    const markupInput = document.getElementById('edit-markup-baru');
+    const tipeInput = document.getElementById('edit-tipe-baru');
+    const displayEl = document.getElementById('display-harga-histori');
+
+    const hp = hpInput ? (parseFloat(hpInput.value) || 0) : 0;
+    const markup = markupInput ? (parseFloat(markupInput.value) || 0) : 0;
+    const tipe = tipeInput ? tipeInput.value : "nominal";
+    
+    let total = 0;
+    if (tipe === "persen") {
+        total = hp + (hp * (markup / 100));
+    } else {
+        total = hp + markup;
+    }
+
+    const hargaFinal = Math.round(total);
+
+    // SAFETY CHECK: Hanya jalankan innerText jika elemennya benar-benar ada
+    if (displayEl) {
+        displayEl.innerText = "(Rp " + hargaFinal.toLocaleString('id-ID') + ")";
+    }
+
+    return hargaFinal;
 }
 
 
@@ -2818,7 +3057,7 @@ async function updateHeaderHistori() {
 }
 
 function renderUlangInvoice(data, container) {
-    if (!data) return;
+    if (!data || !container) return;
 
     // --- 1. IDENTIFIKASI NOMOR (Sinkron dengan SJ) ---
     let noFinal = data.header?.no_surat_jalan || data.nomor_invoice || "-";
@@ -2844,11 +3083,20 @@ function renderUlangInvoice(data, container) {
         }
     }
 
-    // --- 4. AMBIL ITEMS ---
-    const itemsSiap = Object.values(data.items || {});
+    // --- 4. AMBIL ITEMS (DIPERKUAT) ---
+    // Filter ini sangat penting: membuang data null atau item yang tidak punya nama
+    const itemsSiap = Object.values(data.items || {}).filter(item => {
+        return item && typeof item === 'object' && item.nama && item.nama.trim() !== "";
+    });
 
-    // --- 5. LOGIKA PAGING (Otomatis ikut Config, misal 8 baris) ---
-    const perHalaman = PRINT_SETTINGS.barisPerHalaman;
+    if (itemsSiap.length === 0) {
+        console.warn("Render dibatalkan: Tidak ada item valid untuk ditampilkan.");
+        container.innerHTML = '<div class="text-center py-5">Item tidak ditemukan atau data korup.</div>';
+        return;
+    }
+
+    // --- 5. LOGIKA PAGING ---
+    const perHalaman = (typeof PRINT_SETTINGS !== 'undefined' && PRINT_SETTINGS.barisPerHalaman) ? PRINT_SETTINGS.barisPerHalaman : 8;
     const kumpulanHalaman = [];
     for (let i = 0; i < itemsSiap.length; i += perHalaman) {
         kumpulanHalaman.push(itemsSiap.slice(i, i + perHalaman));
@@ -2857,17 +3105,23 @@ function renderUlangInvoice(data, container) {
     container.innerHTML = '';
     
     // --- 6. RENDER DENGAN MASTER TEMPLATE ---
-    kumpulanHalaman.forEach((halamanItems, index) => {
-        const payload = {
-            no_sj: noFinal,
-            tgl_teks: tglTeks,
-            nama_cust: namaCust.toUpperCase(),
-            alamat_cust: alamatCust
-        };
+    try {
+        kumpulanHalaman.forEach((halamanItems, index) => {
+            const payload = {
+                no_sj: noFinal,
+                tgl_teks: tglTeks,
+                // Tambahkan pengecekan pada nama_cust juga agar tidak toUpperCase error
+                nama_cust: (namaCust ? String(namaCust).toUpperCase() : "PELANGGAN UMUM"),
+                alamat_cust: alamatCust
+            };
 
-        // Panggil Mesin Cetak untuk Invoice
-        container.innerHTML += generatePrintTemplate('INV', payload, index, kumpulanHalaman.length, halamanItems);
-    });
+            // Panggil Mesin Cetak untuk Invoice
+            // Pastikan halamanItems yang dikirim sudah bersih dari item undefined
+            container.innerHTML += generatePrintTemplate('INV', payload, index, kumpulanHalaman.length, halamanItems);
+        });
+    } catch (err) {
+        console.error("Kesalahan saat generate template:", err);
+    }
 }
 
 async function shareGambar(idElemen, judulFile) {

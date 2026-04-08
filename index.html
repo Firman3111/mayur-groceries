@@ -766,6 +766,7 @@
 
 
                             <div class="accordion mb-4" id="accordionPanelKirim">
+
                                 <div class="accordion-item border-info shadow-sm mb-2" style="border-radius: 10px; overflow: hidden;">
                                     <h2 class="accordion-header">
                                         <button class="accordion-button collapsed bg-info text-white fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseHeader">
@@ -827,30 +828,50 @@
                                 <div class="accordion-item border-warning shadow-sm mb-2" style="border-radius: 10px; overflow: hidden;">
                                     <h2 class="accordion-header">
                                         <button class="accordion-button collapsed bg-warning text-dark fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseEditHarga">
-                                            <i class="fas fa-edit me-2"></i> Panel Edit Harga Cepat (Invoice)
+                                            <i class="fas fa-edit me-2"></i> Panel Edit Harga & Modal Cepat
                                         </button>
                                     </h2>
+
                                     <div id="collapseEditHarga" class="accordion-collapse collapse" data-bs-parent="#accordionPanelKirim">
                                         <div class="accordion-body bg-white">
                                             <div class="row g-2">
-                                                <div class="col-md-4">
+                                                <div class="col-md-3">
                                                     <label class="small fw-bold">Pilih Item</label>
-                                                    <select id="edit-item-index" class="form-select form-select-sm">
+                                                    <select id="edit-item-index" class="form-select form-select-sm" onchange="sinkronkanInputEditHistori()">
                                                         <option value="">Pilih Item...</option>
                                                     </select>
                                                 </div>
-                                                <div class="col-md-4">
-                                                    <label class="small fw-bold">Harga Baru (Rp)</label>
-                                                    <input type="number" id="edit-harga-baru" class="form-control form-control-sm" placeholder="Contoh: 15000">
+
+                                                <div class="col-md-2">
+                                                    <label class="small fw-bold text-danger">Modal (HPP)</label>
+                                                    <input type="number" id="edit-modal-baru" class="form-control form-control-sm" oninput="hitungHargaHistori()">
                                                 </div>
-                                                <div class="col-md-4 d-flex align-items-end">
-                                                    <button onclick="updateDataPenjualan()" class="btn btn-sm btn-primary w-100 fw-bold">UPDATE HARGA</button>
+
+                                                <div class="col-md-2">
+                                                    <label class="small fw-bold text-warning">Markup</label>
+                                                    <input type="number" id="edit-markup-baru" class="form-control form-control-sm" oninput="hitungHargaHistori()">
+                                                </div>
+
+                                                <div class="col-md-2">
+                                                    <label class="small fw-bold">Tipe</label>
+                                                    <select id="edit-tipe-baru" class="form-select form-select-sm" onchange="hitungHargaHistori()">
+                                                        <option value="persen">%</option>
+                                                        <option value="nominal">Rp</option>
+                                                    </select>
+                                                </div>
+
+                                                <div class="col-md-3 d-flex align-items-end">
+                                                    <button type="button" onclick="updateDataPenjualan(event)" class="btn btn-sm btn-primary w-100 fw-bold">
+                                                        UPDATE & SINKRON <br>
+                                                        <span id="display-harga-histori" style="font-size: 0.7rem;">(Rp 0)</span>
+                                                    </button>
                                                 </div>
                                             </div>
-                                            <div id="status-update" class="small mt-2 text-success" style="display:none;">Data berhasil diperbarui!</div>
+                                            <div id="status-update" class="small mt-2 text-success" style="display:none;">Data disinkronkan ke Operasional & Master!</div>
                                         </div>
                                     </div>
                                 </div>
+                                
                             </div>
 
                             <div class="text-end mb-4">
