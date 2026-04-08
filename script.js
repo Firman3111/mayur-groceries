@@ -509,25 +509,99 @@ const tglHariIni = new Date().toISOString().split('T')[0];
 
 // 2. Fungsi Ambil Data Belanja Hari Ini (Modifikasi Baru)
 function inisialisasiDataHarian() {
-    // KITA HAPUS .equalTo(tglHariIni) agar Admin bisa melihat SEMUA jadwal
+    // Set input filter tanggal ke hari ini SEBELUM data ditarik
+    const inputMulai = document.getElementById('filterTglMulai');
+    const inputSelesai = document.getElementById('filterTglSelesai');
+    
+    if(inputMulai) inputMulai.value = tglHariIni;
+    if(inputSelesai) inputSelesai.value = tglHariIni;
+
     db.ref("belanja")
       .orderByChild("tanggal")
-      .limitToLast(100) // Ambil 100 transaksi terakhir agar tidak berat
+      .limitToLast(100) 
       .on("value", (snapshot) => {
           const data = [];
           snapshot.forEach((child) => {
               data.push(child.val());
           });
           
-          // Simpan ke variabel global
           window.databaseBelanjaHarian = data; 
           
-          // Tampilkan di Tabel Jadwal (Admin melihat SEMUA)
-          renderTabelHarian(data);
+          // --- SARAN SAYA DI SINI ---
+          // Alih-alih langsung renderTabelHarian(data) yang menampilkan SEMUA,
+          // panggil fungsi filter agar tabel LANGSUNG tersaring sesuai input tanggal (Hari Ini)
+          if (typeof filterDataHarian === 'function') {
+              filterDataHarian(); 
+          } else {
+              renderTabelHarian(data);
+          }
           
-          // Tampilkan di Rundown (Fungsi Rundown nanti yang akan memfilter "Hari Ini")
-          renderRundown(data);
+          // Rundown tetap jalan (karena Rundown biasanya punya filter internal sendiri)
+          if (typeof renderRundown === 'function') renderRundown(data);
       });
+}
+
+async function filterDataHarian() {
+    const tglMulai = document.getElementById('filterTglMulai').value;
+    const tglSelesai = document.getElementById('filterTglSelesai').value;
+    const kategoriFilter = document.getElementById('filterKategoriRingkasan').value;
+
+    try {
+        // Ambil data belanja dan master_items
+        const [snapBelanja, snapMaster] = await Promise.all([
+            db.ref('belanja').once('value'),
+            db.ref('master_items').once('value')
+        ]);
+
+        const dataBelanja = snapBelanja.val();
+        const dataMaster = snapMaster.val();
+
+        if (!dataBelanja) {
+            document.getElementById('tabelHarian').innerHTML = '<tr><td colspan="5" class="text-center py-5">Belum ada data belanja.</td></tr>';
+            return;
+        }
+
+        // Buat "Buku Telepon" untuk cek kategori barang berdasarkan namanya
+        const mapKategoriBarang = {};
+        if (dataMaster) {
+            Object.values(dataMaster).forEach(m => {
+                if (m.nama) {
+                    // Simpan kategori yang ada di master_items untuk barang ini
+                    mapKategoriBarang[m.nama.trim().toLowerCase()] = m.kategori || "";
+                }
+            });
+        }
+
+        const hasilFilter = Object.values(dataBelanja).filter(item => {
+            // 1. FILTER TANGGAL
+            let masukTanggal = true;
+            if (tglMulai && tglSelesai) {
+                masukTanggal = item.tanggal >= tglMulai && item.tanggal <= tglSelesai;
+            }
+
+            // 2. FILTER KATEGORI
+            let masukKategori = true;
+            if (kategoriFilter !== "Semua") {
+                // Ambil kategori dari data belanja, kalau gak ada cari di Master
+                const katItem = (item.kategori || mapKategoriBarang[item.nama.trim().toLowerCase()] || "").toLowerCase();
+                const katCari = kategoriFilter.toLowerCase();
+                
+                // Logika pencarian: Cocok persis ATAU mengandung kata tersebut
+                // Contoh: "Sayur" akan masuk jika difilter "Sayuran"
+                masukKategori = katItem.includes(katCari) || katCari.includes(katItem);
+            }
+
+            return masukTanggal && masukKategori;
+        });
+
+        // 3. Tampilkan ke Tabel
+        if (typeof renderTabelHarian === 'function') {
+            renderTabelHarian(hasilFilter);
+        }
+
+    } catch (error) {
+        console.error("Filter Error:", error);
+    }
 }
 
 // 3. Fungsi Isi Dropdown Barang (Tetap Diperlukan)
@@ -654,16 +728,27 @@ function hapusMaster(path, id) { if(confirm("Hapus?")) db.ref(path).child(id).re
 function hapusItem(id) { if(confirm("Hapus item?")) db.ref("belanja/"+id).remove(); }
 
 function updateDropdownKategori(data) {
-    // Dropdown di Halaman Operasional (Lama)
+    // 1. Dropdown di Halaman Operasional
     const s1 = document.getElementById('selectKategori');
-    // Dropdown di Halaman Master Item (Baru)
+    // 2. Dropdown di Halaman Master Item
     const s2 = document.getElementById('masterPilihKategori');
+    // 3. Dropdown di Filter Jadwal Kebutuhan (BARU)
+    const s3 = document.getElementById('filterKategoriRingkasan');
     
-    const options = '<option value="">Pilih Kategori...</option>' + 
-        (data ? Object.values(data).map(v => `<option value="${v.nama}">${v.nama}</option>`).join('') : '');
+    // Siapkan options dasar
+    const listOptions = data ? Object.values(data).map(v => `<option value="${v.nama}">${v.nama}</option>`).join('') : '';
 
-    if(s1) s1.innerHTML = options;
-    if(s2) s2.innerHTML = options;
+    // Render untuk Input (ada "Pilih Kategori...")
+    const optionsInput = '<option value="">Pilih Kategori...</option>' + listOptions;
+    
+    // Render untuk Filter (ada "Semua Kategori")
+    const optionsFilter = '<option value="Semua">Semua Kategori</option>' + listOptions;
+
+    if(s1) s1.innerHTML = optionsInput;
+    if(s2) s2.innerHTML = optionsInput;
+    
+    // Update dropdown filter jadwal kebutuhan
+    if(s3) s3.innerHTML = optionsFilter;
 }
 
 function updateDropdownKaryawan(data) {
