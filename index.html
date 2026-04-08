@@ -78,6 +78,41 @@
     body:has([url*="view="]) #loginOverlay {
         display: none !important;
     }
+
+    @media print {
+    @page {
+        /* Jika ingin A5 Landscape murni (210x148mm) */
+        size: 210mm 148mm; 
+        
+        /* Jika ingin ukuran custom Mas (210x160mm) */
+        /* size: 210mm 160mm; */
+        
+        margin: 5mm 8mm; /* Margin atas-bawah 5mm, kiri-kanan 8mm */
+    }
+
+    body {
+        background: none;
+    }
+
+    .halaman-surat-jalan-print, 
+    .halaman-invoice-print {
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important; /* Reset min-height agar tidak memaksa portrait */
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        transform: scale(1); /* Pastikan skala 100% dulu */
+    }
+
+    /* Menghilangkan elemen yang tidak perlu saat print */
+    .no-print {
+        display: none !important;
+    }
+}
+
+
     </style>
 
 </head>
@@ -536,7 +571,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                         <div style="display: flex; align-items: center;">
                             <div>
-                                <!--<img src="Logo.png" alt="Logo Mayur" style="height: 85px; object-fit: contain;">-->
+                                <img src="Logo.png" alt="Logo Mayur" style="height: 85px; object-fit: contain;">
                                 <div style="font-size: 11px; line-height: 1.3; margin-top: 5px;">
                                     Mandiri Residence Blok G4 No. 11 <br>
                                     Krian - Sidoarjo<br>
@@ -656,7 +691,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                             <div style="display: flex; align-items: center;">
                                 <div>
-                                    <!--<img src="Logo.png" alt="Logo Mayur" style="height: 85px; object-fit: contain;">-->
+                                    <img src="Logo.png" alt="Logo Mayur" style="height: 85px; object-fit: contain;">
                                     <div style="font-size: 11px; line-height: 1.3;">
                                         Mandiri Residence Blok G4 No. 11 <br> Krian - Sidoarjo
                                     </div>
@@ -664,10 +699,8 @@
                             </div>
                             <h4 style="margin: 0; font-weight: bold; text-decoration: underline; padding: 20px;">INVOICE (TAGIHAN)</h4>
                             <div style="text-align: left;">
-                                <div style="font-size: 11px; line-height: 1.3; margin-top: 5px;">
-                                    Mandiri Residence Blok G4 No. 11 <br>
-                                    Krian - Sidoarjo<br>
-                                    T. 0858 4347 4469
+                                <div style="font-size: 16px; margin-top: 5px; font-weight: 600; padding: 8px; border: 2px solid #000;">
+                                    INV. MG: <span id="inv_noSJ" style="font-weight: bold;">-</span> 
                                 </div>
                                 <span id="inv_lokasi_tgl">SIDOARJO, -</span>
                                 <div>
@@ -723,18 +756,121 @@
             </div>
 
 
+            
+
+
 
             <div class="tab-pane fade" id="tab-histori" role="tabpanel">
                     <div class="container-fluid py-3 no-print">
                         <div class="row g-3">
+
+
+                            <div class="accordion mb-4" id="accordionPanelKirim">
+                                <div class="accordion-item border-info shadow-sm mb-2" style="border-radius: 10px; overflow: hidden;">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed bg-info text-white fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseHeader">
+                                            <i class="fas fa-heading me-2"></i> Revisi Data Utama (Header)
+                                        </button>
+                                    </h2>
+                                    <div id="collapseHeader" class="accordion-collapse collapse" data-bs-parent="#accordionPanelKirim">
+                                        <div class="accordion-body bg-white">
+                                            <div class="row g-2">
+                                                <div class="col-md-3">
+                                                    <label class="small fw-bold">Nomor Surat Jalan</label>
+                                                    <input type="text" id="edit-no-sj" class="form-control form-control-sm" placeholder="SJ-XXXXX">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="small fw-bold">Tanggal</label>
+                                                    <input type="date" id="edit-tanggal" class="form-control form-control-sm">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="small fw-bold">Nama Customer</label>
+                                                    <input type="text" id="edit-customer" class="form-control form-control-sm">
+                                                </div>
+                                                <div class="col-md-2 d-flex align-items-end">
+                                                    <button onclick="updateHeaderHistori()" class="btn btn-sm btn-info text-white w-100 fw-bold">UPDATE</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="accordion-item border-success shadow-sm mb-2" style="border-radius: 10px; overflow: hidden;">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed bg-success text-white fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTambahItem">
+                                            <i class="fas fa-plus-circle me-2"></i> Tambah Item Barang Baru
+                                        </button>
+                                    </h2>
+                                    <div id="collapseTambahItem" class="accordion-collapse collapse" data-bs-parent="#accordionPanelKirim">
+                                        <div class="accordion-body bg-white">
+                                            <div class="row g-2">
+                                                <div class="col-md-4">
+                                                    <input type="text" id="add-nama-item" class="form-control form-control-sm" placeholder="Nama Barang">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" id="add-qty-item" class="form-control form-control-sm" placeholder="Qty">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="text" id="add-satuan-item" class="form-control form-control-sm" placeholder="Sat">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" id="add-harga-item" class="form-control form-control-sm" placeholder="Harga Satuan">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <button onclick="tambahItemKeHistori()" class="btn btn-sm btn-success w-100 fw-bold">SIMPAN</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="accordion-item border-warning shadow-sm mb-2" style="border-radius: 10px; overflow: hidden;">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed bg-warning text-dark fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseEditHarga">
+                                            <i class="fas fa-edit me-2"></i> Panel Edit Harga Cepat (Invoice)
+                                        </button>
+                                    </h2>
+                                    <div id="collapseEditHarga" class="accordion-collapse collapse" data-bs-parent="#accordionPanelKirim">
+                                        <div class="accordion-body bg-white">
+                                            <div class="row g-2">
+                                                <div class="col-md-4">
+                                                    <label class="small fw-bold">Pilih Item</label>
+                                                    <select id="edit-item-index" class="form-select form-select-sm">
+                                                        <option value="">Pilih Item...</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="small fw-bold">Harga Baru (Rp)</label>
+                                                    <input type="number" id="edit-harga-baru" class="form-control form-control-sm" placeholder="Contoh: 15000">
+                                                </div>
+                                                <div class="col-md-4 d-flex align-items-end">
+                                                    <button onclick="updateDataPenjualan()" class="btn btn-sm btn-primary w-100 fw-bold">UPDATE HARGA</button>
+                                                </div>
+                                            </div>
+                                            <div id="status-update" class="small mt-2 text-success" style="display:none;">Data berhasil diperbarui!</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-end mb-4">
+                                <button onclick="resetDanBersihkanItem()" class="btn btn-sm btn-outline-danger border-0">
+                                    <i class="fas fa-trash-alt me-1"></i> Reset Nota
+                                </button>
+                            </div>
+                                
+
+
                             
                             <div class="col-lg-4 col-md-5">
+
                                 <div class="card shadow-sm border-0 rounded-4">
                                     <div class="card-header bg-white py-3 border-bottom-0">
                                         <h6 class="fw-bold mb-0 text-success text-center">
                                             <i class="bi bi-archive-fill me-2"></i>ARSIP PENGIRIMAN
                                         </h6>
                                     </div>
+                                    
                                     
                                     <div class="card-body pt-0">
                                         <div class="bg-light p-2 rounded-3 mb-3">
@@ -779,6 +915,9 @@
                             </div>
 
                         </div>
+
+
+                        
                     </div>
             </div>
 

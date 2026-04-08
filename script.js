@@ -63,6 +63,144 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+const PRINT_SETTINGS = {
+    fontDasar: "12pt",       // Pilihan aman untuk 8 baris A5
+    fontJudul: "20pt", 
+    fontNomorMG: "16pt",
+    fontKecil:"10pt",
+    barisPerHalaman: 8,
+    namaToko: "MAYUR GROCERIES",
+    alamatToko: "Mandiri Residence Blok G4 No. 11 Krian",
+    kontakToko: "0858 4347 4469"
+};
+
+function generatePrintTemplate(type, data, index, totalHlm, hlmItems) {
+    const isSJ = type === 'SJ';
+    const noUrutMulai = index * PRINT_SETTINGS.barisPerHalaman;
+    
+    // --- Logika Baris Tabel ---
+    let rowsHtml = '';
+    hlmItems.forEach((item, idx) => {
+        const noUrut = noUrutMulai + (idx + 1);
+        const qty = item.qty || item.qtyBersih || item.jumlah || 0;
+        
+        if (isSJ) {
+            // Template Baris Surat Jalan
+            rowsHtml += `
+                <tr style="font-size: ${PRINT_SETTINGS.fontDasar};">
+                    <td style="border: 1px solid #000; padding: 2px; text-align: center;">${noUrut}</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px; text-transform: uppercase; font-weight: bold;">${item.nama}</td>
+                    <td style="border: 1px solid #000; padding: 2px; text-align: center; font-weight: bold;">${qty} KG</td>
+                </tr>`;
+        } else {
+            // Template Baris Invoice
+            const harga = parseFloat(item.harga || 0);
+            const subtotal = qty * harga;
+            rowsHtml += `
+                <tr style="font-size: ${PRINT_SETTINGS.fontDasar};">
+                    <td style="border: 1px solid #000; padding: 2px; text-align: center;">${noUrut}</td>
+                    <td style="border: 1px solid #000; padding: 2px 8px; font-weight: bold;">${item.nama.toUpperCase()}</td>
+                    <td style="border: 1px solid #000; padding: 2px; text-align: center;">${qty}</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; text-align: right;">${harga.toLocaleString('id-ID')}</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; text-align: right; font-weight: bold;">${subtotal.toLocaleString('id-ID')}</td>
+                </tr>`;
+        }
+    });
+
+    // --- Baris Kosong Penyeimbang ---
+    const sisaBaris = PRINT_SETTINGS.barisPerHalaman - hlmItems.length;
+    const kolomTabel = isSJ ? 3 : 5;
+    for (let i = 0; i < sisaBaris; i++) {
+        rowsHtml += `<tr style="font-size: ${PRINT_SETTINGS.fontDasar};">
+            <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
+            ${'<td style="border: 1px solid #000;"></td>'.repeat(kolomTabel - 1)}
+        </tr>`;
+    }
+
+    // --- Footer Khusus Invoice ---
+    let footerTabel = '';
+    if (!isSJ) {
+        const totalHalaman = hlmItems.reduce((acc, curr) => acc + ((curr.qty || curr.qtyBersih || curr.jumlah || 0) * (curr.harga || 0)), 0);
+        footerTabel = `
+            <tfoot>
+                <tr style="font-size: ${PRINT_SETTINGS.fontDasar}; background: #f9f9f9;">
+                    <td colspan="4" style="border: 1px solid #000; padding: 5px 10px; text-align: right; font-weight: bold;">TOTAL HALAMAN INI :</td>
+                    <td style="border: 1px solid #000; padding: 5px; text-align: right; font-weight: bold;">Rp ${totalHalaman.toLocaleString('id-ID')}</td>
+                </tr>
+            </tfoot>`;
+    }
+
+    // --- Template Utama ---
+    return `
+        <div class="halaman-print" style="${index > 0 ? 'page-break-before: always; margin-top: 20px;' : ''} width: 100%; color: #000; font-family: Arial, sans-serif; 
+        padding: 15px; min-height: 140mm; box-sizing: border-box;"><div class="halaman-print" style="${index > 0 ? 'page-break-before: always; margin-top: 20px;' : ''} width: 100%; color: #000; font-family: Arial, sans-serif; padding: 15px; min-height: 140mm; box-sizing: border-box;">
+            
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                <div style="flex: 1.2;">
+                    <div style="line-height: 1.2; font-size: ${PRINT_SETTINGS.fontKecil};">
+                        ${PRINT_SETTINGS.alamatToko}<br>
+                        ${PRINT_SETTINGS.kontakToko}
+                    </div>
+                </div>
+                
+                <div style="flex: 1.5; text-align: center; padding: 0 5px;">
+                    <h3 style="
+                        margin: 0; 
+                        font-weight: bold; 
+                        text-decoration: underline; 
+                        font-size: ${isSJ ? '18pt' : PRINT_SETTINGS.fontJudul}; 
+                        letter-spacing: 1px; 
+                        white-space: nowrap;
+                        display: inline-block;
+                    ">
+                        ${isSJ ? 'SURAT JALAN' : 'INVOICE'}
+                    </h3>
+                    <div style="font-size: 10pt; margin-top: 2px;">Halaman ${index + 1} dari ${totalHlm}</div>
+                </div>
+
+                <div style="flex: 1.2; display: flex; justify-content: flex-end;">
+                    <div style="text-align: left; min-width: 210px; font-size: ${PRINT_SETTINGS.fontKecil || '10pt'};">
+                        <div style="font-size: ${PRINT_SETTINGS.fontNomorMG}; font-weight: bold; padding: 5px; border: 3px solid #000; margin-bottom: 5px; text-align: center; line-height: 1;">
+                            ${isSJ ? 'NO. MG: ' : 'INV. MG: '}${data.no_sj}
+                        </div>
+                        <div style="font-weight: bold; margin-bottom: 2px;">${data.tgl_teks}</div>
+                        <div style="line-height: 1.2;">
+                            <strong>Kepada Yth.</strong><br>
+                            <span style="text-transform: uppercase; font-weight: bold;">${data.nama_cust}</span><br>
+                            <div style="font-size: 11pt; margin-top: 2px;">${data.alamat_cust}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; margin-top: 10px;">
+                <thead>
+                    <tr style="text-align: center; background-color: #f2f2f2; font-size: ${PRINT_SETTINGS.fontDasar};">
+                        <th style="border: 1px solid #000; padding: 5px; width: 40px;">NO</th>
+                        <th style="border: 1px solid #000; padding: 5px;">${isSJ ? 'JENIS PESANAN' : 'NAMA BARANG'}</th>
+                        ${isSJ ? '<th style="border: 1px solid #000; padding: 5px; width: 140px;">JUMLAH</th>' : 
+                        '<th style="border: 1px solid #000; width: 60px;">QTY</th><th style="border: 1px solid #000; width: 100px;">HARGA</th><th style="border: 1px solid #000; width: 120px;">TOTAL</th>'}
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+                ${footerTabel}
+            </table>
+
+            <div style="margin-top: 10px; font-size: ${PRINT_SETTINGS.fontKecil};">
+                ${!isSJ ? '<strong>Pembayaran:</strong> BCA 0123456789 a/n Wiwit Diana Sari' : ''}
+            </div>
+
+            <table style="width: 100%; margin-top: 15px; text-align: center; font-size: ${PRINT_SETTINGS.fontDasar}; border: none !important;">
+                <tr>
+                    <td style="width: 33%; border: none !important;">Dibuat Oleh,<br><br><br>( <strong>Firman Agung</strong> )</td>
+                    <td style="width: 33%; border: none !important;">Diperiksa Oleh,<br><br><br>( <strong>Wiwit Diana Sari</strong> )</td>
+                    <td style="width: 33%; border: none !important;">Penerima,<br><br><br>( .......................... )</td>
+                </tr>
+            </table>
+            <hr style="border-top: 1px dashed #ccc; margin: 15px 0;" class="no-print">
+        </div>`;
+}
+
 
 //------------------------------------------------------------------------- HALAMAN OPERASIONAL ----------------------------------------------------------
 
@@ -1681,24 +1819,18 @@ function sinkronkanSuratJalan() {
     const containerUtama = document.getElementById('area-cetak'); 
     if (!containerUtama) return;
 
-    // --- MODIFIKASI FILTER DISINI ---
-    // Menambahkan pengecekan status_sj agar tidak terjadi penumpukan data lama
+    // --- 1. LOGIKA FILTER DATA ---
     const itemsSiap = databaseBelanja.filter(item => 
         item.step3 === true && 
         (item.status_sj === "pending" || item.status_sj === undefined)
     );
-    // --------------------------------
     
     if (itemsSiap.length === 0) {
-        containerUtama.innerHTML = `
-            <div class="text-center py-5 no-print">
-                <div class="text-muted mb-2">Belum ada barang yang berstatus SIAP (Pending).</div>
-                <small class="text-danger">Pastikan Step 3 di Rundown sudah dicentang dan item belum dikirim sebelumnya.</small>
-            </div>`;
+        containerUtama.innerHTML = `<div class="text-center py-5 no-print">Belum ada barang siap kirim.</div>`;
         return;
     }
 
-    // 1. Ambil data header
+    // --- 2. LOGIKA HEADER & PENOMORAN ---
     const noSJRaw = document.getElementById('sj_nomor')?.value || "";
     const tglInput = document.getElementById('sj_tanggal')?.value;
     const alamatFull = document.getElementById('sj_alamat')?.value || "";
@@ -1721,102 +1853,32 @@ function sinkronkanSuratJalan() {
         alamatCust = baris.length > 1 ? baris.slice(1).join('<br>') : "-";
     }
 
-    const perHalaman = 5;
+    // --- 3. LOGIKA PAGING ---
+    const perHalaman = PRINT_SETTINGS.barisPerHalaman; // Mengambil dari config global (8)
     const kumpulanHalaman = [];
     for (let i = 0; i < itemsSiap.length; i += perHalaman) {
         kumpulanHalaman.push(itemsSiap.slice(i, i + perHalaman));
     }
 
-    // 2. Reset container
+    // --- 4. RENDER MENGGUNAKAN MASTER TEMPLATE ---
     containerUtama.innerHTML = ''; 
-    containerUtama.style.background = 'transparent';
-    containerUtama.style.border = 'none';
-    containerUtama.style.padding = '0';
 
     kumpulanHalaman.forEach((halamanItems, index) => {
-        const hlmKe = index + 1;
-        const totalHlm = kumpulanHalaman.length;
+        // Hitung Nomor SJ per halaman jika otomatis bertambah
         const noSJFinal = prefixMG + (angkaUrutMulai + index).toString().padStart(2, '0');
 
-        let rowsHtml = '';
-        halamanItems.forEach((item, idx) => {
-            const noUrut = (index * perHalaman) + (idx + 1);
-            // Gunakan qtyBersih jika ada, jika tidak gunakan jumlah biasa
-            const displayQty = item.qtyBersih ? Number(item.qtyBersih).toFixed(2) : (item.jumlah || 0);
-            
-            rowsHtml += `
-                <tr>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: center;">${noUrut}</td>
-                    <td style="border: 1px solid #000; padding: 8px 12px; text-transform: uppercase; font-weight: bold;">${item.nama}</td>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">
-                        ${displayQty} KG
-                    </td>
-                </tr>`;
-        });
+        // Siapkan Payload untuk dikirim ke Master Template
+        const payload = {
+            no_sj: noSJFinal,
+            tgl_teks: tglTeks,
+            nama_cust: namaCust,
+            alamat_cust: alamatCust
+        };
 
-        // Baris kosong penyeimbang
-        for (let i = halamanItems.length; i < perHalaman; i++) {
-            rowsHtml += `<tr><td style="border: 1px solid #000; padding: 18px;">&nbsp;</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
-        }
-
-        // 3. Render Struktur
-        containerUtama.innerHTML += `
-            <div class="halaman-surat-jalan-print" style="${index > 0 ? 'page-break-before: always;' : ''} width: 100%; color: #000; font-family: Arial, sans-serif; background: white; padding: 25px;">
-                
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                    <div style="flex: 1;">
-                        
-                        <div style="font-size: 11px; line-height: 1.3;">
-                            <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
-                            Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
-                            wiwitdianasari@gmail.com | 0858 4347 4469
-                        </div>
-                    </div>
-
-                    <div style="flex: 1; text-align: center; padding-top: 10px;">
-                        <h3 style="margin: 0; font-weight: bold; text-decoration: underline; font-size: 20px; letter-spacing: 2px;">SURAT JALAN</h3>
-                        <small style="font-size: 11px;">Halaman ${hlmKe} dari ${totalHlm}</small>
-                    </div>
-
-                    <div style="flex: 1; display: flex; justify-content: flex-end;">
-                        <div style="text-align: left; min-width: 200px;">
-                            <div style="font-size: 16px; font-weight: bold; padding: 8px; border: 2.5px solid #000; margin-bottom: 10px; text-align: center;">
-                                NO. MG: ${noSJFinal}
-                            </div>
-                            <div style="font-weight: bold; font-size: 13px;">${tglTeks}</div>
-                            <div style="font-size: 13px; margin-top: 5px;">
-                                <strong>Kepada Yth.</strong><br>
-                                <span style="text-transform: uppercase; font-weight: bold;">${namaCust}</span><br>
-                                <div style="line-height: 1.2;">${alamatCust}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 13px; margin-top: 30px;">
-                    <thead>
-                        <tr style="text-align: center; background-color: #f2f2f2;">
-                            <th style="border: 1px solid #000; padding: 10px; width: 50px;">NO</th>
-                            <th style="border: 1px solid #000; padding: 10px;">JENIS PESANAN</th>
-                            <th style="border: 1px solid #000; padding: 10px; width: 150px;">JUMLAH</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rowsHtml}</tbody>
-                </table>
-
-                <table style="width: 100%; margin-top: 50px; text-align: center; font-size: 13px; border: none !important;">
-                    <tr>
-                        <td style="border: none !important; width: 33%;">Dibuat Oleh,<br><br><br><br>( <strong>Firman Agung</strong> )</td>
-                        <td style="border: none !important; width: 33%;">Diperiksa Oleh,<br><br><br><br>( <strong>Wiwit Diana Sari</strong> )</td>
-                        <td style="border: none !important; width: 33%;">Penerima,<br><br><br><br>( .......................... )</td>
-                    </tr>
-                </table>
-
-                <hr style="border-top: 1px dashed #ccc; margin: 30px 0;" class="no-print">
-            </div>`;
+        // Panggil si "Mesin Cetak"
+        containerUtama.innerHTML += generatePrintTemplate('SJ', payload, index, kumpulanHalaman.length, halamanItems);
     });
 
-    // Simpan data yang sedang tampil ke variabel global agar bisa di-update statusnya saat cetak
     window.itemsAkanDicetak = itemsSiap;
 }
 
@@ -1947,152 +2009,84 @@ function aktifkanLiveTracking() {
     });
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function sinkronkanInvoice() {
     const containerUtama = document.getElementById('area-cetak-invoice');
     if (!containerUtama) return;
 
-    // 1. Ambil data dasar dari input
-    const noSJ = document.getElementById('sj_nomor')?.value || "-";
+    // --- 1. DATA HEADER ---
+    const noSJRaw = document.getElementById('sj_nomor')?.value || "-";
     const tglInput = document.getElementById('sj_tanggal')?.value;
-    let tglTeks = "SIDOARJO, -";
+    const alamatCust = document.getElementById('sj_alamat')?.value || "-";
+    const namaCust = document.getElementById('p_cust')?.value || "-";
+
+    let tglTeks = "-";
     if (tglInput) {
         const d = new Date(tglInput);
         const daftarBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
         tglTeks = `SIDOARJO, ${d.getDate()} ${daftarBulan[d.getMonth()]} ${d.getFullYear()}`;
     }
-    const alamatCust = document.getElementById('sj_alamat')?.value || "-";
-    const namaCust = document.getElementById('p_cust')?.value|| "-";
-    
 
-    // 2. KUNCI PERBAIKAN: Filter barang yang SIAP (Step 3) DAN belum dikirim (status_sj pending)
+    // --- 2. FILTER DATA ---
     const itemsSiap = databaseBelanja.filter(item => 
         item.step3 === true && 
         (item.status_sj === "pending" || item.status_sj === undefined)
     );
     
     if (itemsSiap.length === 0) {
-        containerUtama.innerHTML = '<div class="text-center py-5 no-print">Belum ada barang siap kirim atau semua sudah diproses stok.</div>';
+        containerUtama.innerHTML = '<div class="text-center py-5 no-print">Belum ada barang siap kirim.</div>';
         return;
     }
 
-    // 3. Pecah data menjadi kelompok per 5 item
-    const perHalaman = 5;
+    // --- 3. PAGING (8 BARIS) ---
+    const perHalaman = PRINT_SETTINGS.barisPerHalaman;
     const kumpulanHalaman = [];
     for (let i = 0; i < itemsSiap.length; i += perHalaman) {
         kumpulanHalaman.push(itemsSiap.slice(i, i + perHalaman));
     }
 
-    // 4. Bersihkan kontainer
+    // --- 4. RENDER ---
     containerUtama.innerHTML = '';
 
     kumpulanHalaman.forEach((halamanItems, index) => {
-        let grandTotalHalaman = 0;
-        let rowsHtml = '';
+        // Siapkan Payload untuk Invoice
+        const payload = {
+            no_sj: noSJRaw, // Gunakan nomor yang diinput
+            tgl_teks: tglTeks,
+            nama_cust: namaCust.toUpperCase(),
+            alamat_cust: alamatCust
+        };
 
-        halamanItems.forEach((item, idx) => {
-            const noUrut = (index * perHalaman) + (idx + 1);
-            const qty = parseFloat(item.qtyBersih || item.jumlah || 0);
-            const hargaSatuan = parseFloat(item.harga || 0);
-            const subtotal = qty * hargaSatuan;
-            grandTotalHalaman += subtotal;
-
-            rowsHtml += `
-                <tr>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: center;">${noUrut}</td>
-                    <td style="border: 1px solid #000; padding: 8px;">${item.nama.toUpperCase()}</td>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: center;">${qty} ${item.satuan || 'KG'}</td>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: right;">Rp ${hargaSatuan.toLocaleString('id-ID')}</td>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: right;">Rp ${subtotal.toLocaleString('id-ID')}</td>
-                </tr>`;
-        });
-
-        // Baris kosong
-        for (let i = halamanItems.length; i < perHalaman; i++) {
-            rowsHtml += `
-                <tr>
-                    <td style="border: 1px solid #000; padding: 18px;">&nbsp;</td>
-                    <td style="border: 1px solid #000;"></td>
-                    <td style="border: 1px solid #000;"></td>
-                    <td style="border: 1px solid #000;"></td>
-                    <td style="border: 1px solid #000;"></td>
-                </tr>`;
-        }
-
-        // Render struktur HTML
-        containerUtama.innerHTML += `
-            <div class="halaman-invoice-print" style="${index > 0 ? 'page-break-before: always; margin-top: 20px;' : ''} width: 100%; color: #000; font-family: 'Arial', sans-serif; box-sizing: border-box; padding: 20px;">
-                
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                    <div style="display: flex; align-items: center;">
-                        <div>
-                            
-                            <div style="font-size: 11px; line-height: 1.3;">
-                                <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
-                                Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
-                                wiwitdianasari@gmail.com | 0858 4347 4469
-                            </div>
-                        </div>
-                    </div>
-                    <h4 style="margin: 0; font-weight: bold; text-decoration: underline; padding: 24px;">INVOICE</h4>
-                    <div style="text-align: left;">
-                        <div style="font-size: 16px; margin-top: 5px; font-weight: 600; padding: 8px; border: 2px solid #000;">
-                            INV. MG: <span id="inv_noSJ">${noSJ}</span>
-                        </div>
-                        <div id="inv_lokasi_tgl" style="font-weight: bold; font-size: 13px; margin-top: 15px;">${tglTeks}</div>
-                        <div style="font-size: 13px; margin-top: 5px;">
-                                <strong>Kepada Yth.</strong><br>
-                                <span id="inv_cust" style="text-transform: uppercase; font-weight: bold;">${namaCust}</span><br>
-                                <div id="inv_alamat" style="line-height: 1.2;">${alamatCust}</div>
-                            </div>
-                    </div>
-                </div>
-
-                <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 13px;">
-                    <thead>
-                        <tr style="text-align: center; background-color: #ebebeb;">
-                            <th style="border: 1px solid #000; padding: 8px; width: 50px;">NO</th>
-                            <th style="border: 1px solid #000; padding: 8px;">NAMA BARANG</th>
-                            <th style="border: 1px solid #000; padding: 8px;">JUMLAH</th>
-                            <th style="border: 1px solid #000; padding: 8px;">HARGA SATUAN</th>
-                            <th style="border: 1px solid #000; padding: 8px;">SUBTOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listInvoice">
-                        ${rowsHtml}
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="4" style="border: 1px solid #000; padding: 10px; text-align: right; font-weight: bold; font-size: 15px;">GRAND TOTAL HALAMAN INI :</td>
-                            <td id="inv_grandTotal" style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold; font-size: 15px; background: #f9f9f9;">
-                                Rp ${grandTotalHalaman.toLocaleString('id-ID')}
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
-
-                <div style="margin-top: 5px; font-size: 10px;">
-                    <p><strong>Pembayaran via Transfer:</strong> BCA : 0123456789 a/n Wiwit Diana Sari</p>
-                </div>
-
-                <table style="width: 100%; margin-top: 10px; text-align: center; font-size: 12px; border: none !important;">
-                    <tr>
-                        <td style="width: 33%; border: none !important;">
-                            Dibuat Oleh,<br><br><br><br>
-                            ( <strong>Firman Agung</strong> )
-                        </td>
-                        <td style="width: 33%; border: none !important;">
-                            Diperiksa Oleh,<br><br><br><br>
-                            ( <strong>Wiwit Diana Sari</strong> )
-                        </td>
-                        <td style="width: 33%; border: none !important;">
-                            Penerima,<br><br><br><br>
-                            ( .......................... )
-                        </td>
-                    </tr>
-                </table>
-
-                <hr style="border-top: 1px dashed #ccc; margin: 20px 0;" class="no-print">
-            </div>`;
+        // Panggil Master Template dengan type 'INV'
+        containerUtama.innerHTML += generatePrintTemplate('INV', payload, index, kumpulanHalaman.length, halamanItems);
     });
 }
 
@@ -2343,6 +2337,8 @@ async function hapusBanyakItem() {
     }
 }
 
+//----------------------------------------------------------------------------------------------------------------------------------------------
+
 // Simpan status halaman histori dalam satu objek agar aman
 window.HistoriApp = {
     mode: 'SJ',       // Default: Surat Jalan
@@ -2414,50 +2410,85 @@ function muatDaftarHistori() {
 }
 
 async function renderPreviewHistori(id) {
-    // 1. Simpan ID agar saat ganti mode (SJ/INV) tetap konsisten
+    if (!id) return;
     window.HistoriApp.idTerpilih = id; 
     
     const area = document.getElementById('area-preview-histori');
-    const titleLabel = document.getElementById('previewTitle');
-
+    const selectItem = document.getElementById('edit-item-index'); 
     if (!area) return;
 
-    // 2. SAPU BERSIH: Pastikan area benar-benar kosong sebelum render baru
-    area.innerHTML = ''; 
-    
-    // Tampilkan loading sebentar di dalam area yang sudah kosong
-    const loadingDiv = document.createElement('div');
-    loadingDiv.className = "text-center py-5 text-muted small";
-    loadingDiv.innerHTML = '<div class="spinner-border spinner-border-sm mb-2"></div><br>Sinkronisasi data...';
-    area.appendChild(loadingDiv);
+    area.innerHTML = '<div class="text-center py-5 text-muted small">Menyinkronkan data...</div>';
 
     try {
-        const snapshot = await db.ref(`history_pengiriman/${id}`).once('value');
-        const fullData = snapshot.val();
-        
-        if (!fullData) {
-            area.innerHTML = '<div class="p-5 text-center">Data tidak ditemukan.</div>';
+        // 1. Ambil data pengiriman (Pakai await agar pasti selesai ambil data)
+        const snapKirim = await db.ref(`history_pengiriman/${id}`).once('value');
+        const dataKirim = snapKirim.val();
+
+        if (!dataKirim) {
+            area.innerHTML = 'Data tidak ditemukan.';
             return;
         }
 
-        // 3. Update Judul Header
-        if (titleLabel) titleLabel.innerText = `DOKUMEN: ${fullData.header.no_surat_jalan}`;
+        // --- Isi Otomatis Input Header ---
+        if (dataKirim.header) {
+            if (document.getElementById('edit-no-sj')) document.getElementById('edit-no-sj').value = dataKirim.header.no_surat_jalan || "";
+            if (document.getElementById('edit-tanggal')) document.getElementById('edit-tanggal').value = dataKirim.header.tanggal_kirim || "";
+            if (document.getElementById('edit-customer')) document.getElementById('edit-customer').value = dataKirim.header.customer || "";
+        }
 
-        // 4. BERSIHKAN LAGI: Hapus loading sebelum memasukkan template asli
-        area.innerHTML = ''; 
+        // 2. Logika Khusus Invoice
+        if (window.HistoriApp.mode === 'INV') {
+            // Ambil data Riwayat_Penjualan TERBARU
+            const snapSemuaJual = await db.ref(`Riwayat_Penjualan`).once('value');
+            const semuaPenjualan = snapSemuaJual.val();
+            
+            const noSJ = dataKirim.header?.no_surat_jalan || "";
+            let targetInvoice = noSJ.includes('SJ-') ? noSJ.replace('SJ-', 'MG ') : "MG " + noSJ;
+            targetInvoice = targetInvoice.trim();
 
-        // 5. Eksekusi Render berdasarkan MODE yang aktif
-        if (window.HistoriApp.mode === 'SJ') {
-            renderUlangSuratJalan(fullData, area);
+            let dataJual = null;
+            if (semuaPenjualan) {
+                const findKey = Object.keys(semuaPenjualan).find(key => 
+                    semuaPenjualan[key].nomor_invoice === targetInvoice
+                );
+                if (findKey) dataJual = semuaPenjualan[findKey];
+            }
+
+            // Jika Data Jual ketemu, suntik harga ke dataKirim sebelum render
+            if (dataJual && dataJual.items) {
+                console.log("SUKSES: Data Jual ditemukan untuk render harga baru.");
+                
+                if (selectItem) selectItem.innerHTML = '<option value="">Pilih Item...</option>';
+                
+                const keysKirim = Object.keys(dataKirim.items || {});
+                keysKirim.forEach((key, index) => {
+                    const itemHarga = dataJual.items[index]; 
+                    if (itemHarga) {
+                        // UPDATE OBJECT DI MEMORY
+                        dataKirim.items[key].harga = itemHarga.harga;
+                        dataKirim.items[key].subtotal = itemHarga.sub_total || itemHarga.subtotal || 0;
+                        
+                        if (selectItem) {
+                            selectItem.innerHTML += `<option value="${index}">${itemHarga.nama} (Rp ${itemHarga.harga})</option>`;
+                        }
+                    }
+                });
+            } else {
+                console.warn("PERINGATAN: Render harga gagal karena nomor invoice tidak cocok di Riwayat_Penjualan.");
+            }
+
+            // Render ke tabel dengan data yang sudah disuntik harga baru
+            renderUlangInvoice(dataKirim, area);
+            
         } else {
-            renderUlangInvoice(fullData, area);
+            renderUlangSuratJalan(dataKirim, area);
         }
 
     } catch (err) {
-        console.error("Gagal render:", err);
-        area.innerHTML = '<div class="alert alert-danger m-3">Gagal memuat dokumen.</div>';
+        console.error("Render Error:", err);
     }
 }
+
 
 function filterHistori() {
     const keyword = document.getElementById('historiSearch').value.toLowerCase();
@@ -2482,18 +2513,16 @@ function renderUlangSuratJalan(data, container) {
     const itemsRaw = data.items || {};
     const itemsSiap = Object.values(itemsRaw);
 
-    // --- LOGIKA PENOMORAN IDENTIK ---
+    // --- 1. LOGIKA PENOMORAN (Tetap dipertahankan agar data lama tetap rapi) ---
     let noSJFinal = header.no_surat_jalan || "";
-    // Jika formatnya masih timestamp (panjang), kita rapikan
     if (noSJFinal.length > 12) {
         const cleanNumber = noSJFinal.replace('SJ-', '');
         noSJFinal = 'MG-' + cleanNumber.substring(cleanNumber.length - 5);
     } else {
-        // Ganti prefix SJ menjadi MG agar seragam dengan layout baru
         noSJFinal = noSJFinal.replace('SJ-', 'MG-').replace('SJ', 'MG');
     }
 
-    // --- LOGIKA TANGGAL ---
+    // --- 2. LOGIKA TANGGAL ---
     let tglTeks = "-";
     if (header.tanggal_kirim) {
         const d = new Date(header.tanggal_kirim);
@@ -2501,8 +2530,8 @@ function renderUlangSuratJalan(data, container) {
         tglTeks = `SIDOARJO, ${d.getDate()} ${daftarBulan[d.getMonth()]} ${d.getFullYear()}`;
     }
 
-    // --- LOGIKA PAGING (5 baris per halaman) ---
-    const perHalaman = 5;
+    // --- 3. LOGIKA PAGING (Sekarang otomatis 8 baris dari Config) ---
+    const perHalaman = PRINT_SETTINGS.barisPerHalaman;
     const kumpulanHalaman = [];
     for (let i = 0; i < itemsSiap.length; i += perHalaman) {
         kumpulanHalaman.push(itemsSiap.slice(i, i + perHalaman));
@@ -2511,81 +2540,18 @@ function renderUlangSuratJalan(data, container) {
     // Reset Container
     container.innerHTML = '';
     
+    // --- 4. RENDER MENGGUNAKAN MASTER TEMPLATE ---
     kumpulanHalaman.forEach((halamanItems, index) => {
-        const hlmKe = index + 1;
-        const totalHlm = kumpulanHalaman.length;
+        // Siapkan Payload dari data Histori
+        const payload = {
+            no_sj: noSJFinal,
+            tgl_teks: tglTeks,
+            nama_cust: (header.nama_pelanggan || "PELANGGAN UMUM").toUpperCase(),
+            alamat_cust: header.alamat || "SIDOARJO / SURABAYA"
+        };
 
-        let rowsHtml = '';
-        halamanItems.forEach((item, idx) => {
-            const noUrut = (index * perHalaman) + (idx + 1);
-            rowsHtml += `
-                <tr>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: center;">${noUrut}</td>
-                    <td style="border: 1px solid #000; padding: 8px 12px; text-transform: uppercase;">${item.nama}</td>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">
-                        ${item.qty || 0} KG
-                    </td>
-                </tr>`;
-        });
-
-        // Baris kosong penyeimbang (agar tinggi tabel konsisten)
-        for (let i = halamanItems.length; i < perHalaman; i++) {
-            rowsHtml += `<tr><td style="border: 1px solid #000; padding: 18px;">&nbsp;</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
-        }
-
-        // RENDER LAYOUT IDENTIK
-        container.innerHTML += `
-            <div class="halaman-surat-jalan-print" style="${index > 0 ? 'page-break-before: always;' : ''} width: 100%; color: #000; font-family: Arial, sans-serif; background: white; padding: 25px; box-sizing: border-box;">
-                
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                    <div style="flex: 1;">
-                        <img src="Logo.png" alt="Logo" style="height: 100px; object-fit: contain; margin-bottom: 5px;">
-                        <div style="font-size: 11px; line-height: 1.3;">
-                            <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
-                            Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
-                            wiwitdianasari@gmail.com | 0858 4347 4469
-                        </div>
-                    </div>
-
-                    <div style="flex: 1; text-align: center; padding-top: 10px;">
-                        <h3 style="margin: 0; font-weight: bold; text-decoration: underline; font-size: 20px; letter-spacing: 2px;">SURAT JALAN</h3>
-                        <small style="font-size: 11px;">Halaman ${hlmKe} dari ${totalHlm}</small>
-                    </div>
-
-                    <div style="flex: 1; display: flex; justify-content: flex-end;">
-                        <div style="text-align: left; min-width: 200px;">
-                            <div style="font-size: 16px; font-weight: bold; padding: 8px; border: 2.5px solid #000; margin-bottom: 10px; text-align: center;">
-                                NO. MG: ${noSJFinal}
-                            </div>
-                            <div style="font-weight: bold; font-size: 13px;">${tglTeks}</div>
-                            <div style="font-size: 13px; margin-top: 5px;">
-                                <strong>Kepada Yth.</strong><br>
-                                <span style="text-transform: uppercase; font-weight: bold;">PELANGGAN UMUM</span><br>
-                                <div style="line-height: 1.2;">SIDOARJO / SURABAYA</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 13px; margin-top: 30px;">
-                    <thead>
-                        <tr style="text-align: center; background-color: #f2f2f2;">
-                            <th style="border: 1px solid #000; padding: 10px; width: 50px;">NO</th>
-                            <th style="border: 1px solid #000; padding: 10px;">JENIS PESANAN</th>
-                            <th style="border: 1px solid #000; padding: 10px; width: 150px;">JUMLAH</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rowsHtml}</tbody>
-                </table>
-
-                <table style="width: 100%; margin-top: 50px; text-align: center; font-size: 13px; border: none !important;">
-                    <tr>
-                        <td style="border: none !important; width: 33%;">Dibuat Oleh,<br><br><br><br>( <strong>Firman Agung</strong> )</td>
-                        <td style="border: none !important; width: 33%;">Diperiksa Oleh,<br><br><br><br>( <strong>Wiwit Diana Sari</strong> )</td>
-                        <td style="border: none !important; width: 33%;">Penerima,<br><br><br><br>( .......................... )</td>
-                    </tr>
-                </table>
-            </div>`;
+        // Panggil Mesin Cetak
+        container.innerHTML += generatePrintTemplate('SJ', payload, index, kumpulanHalaman.length, halamanItems);
     });
 }
 
@@ -2601,40 +2567,288 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1000);
 });
 
+async function updateDataPenjualan() {
+    const id = window.HistoriApp.idTerpilih;
+    const indexItem = document.getElementById('edit-item-index').value;
+    const hargaBaru = parseFloat(document.getElementById('edit-harga-baru').value);
+
+    if (!id || indexItem === "" || isNaN(hargaBaru)) {
+        alert("Pilih item dan masukkan harga yang valid!");
+        return;
+    }
+
+    try {
+        // 1. Ambil data pengiriman untuk mendapatkan No SJ
+        const snapKirim = await db.ref(`history_pengiriman/${id}`).once('value');
+        const dataKirim = snapKirim.val();
+        if (!dataKirim) return;
+
+        const noSJ = dataKirim.header?.no_surat_jalan || "";
+        
+        // --- LOGIKA SINKRONISASI FORMAT (PENTING!) ---
+        let targetInvoice = noSJ.includes('SJ-') ? noSJ.replace('SJ-', 'MG ') : "MG " + noSJ;
+        targetInvoice = targetInvoice.trim();
+
+        // 2. Cari Key di Riwayat_Penjualan
+        const snapSemuaJual = await db.ref(`Riwayat_Penjualan`).once('value');
+        const semuaPenjualan = snapSemuaJual.val();
+        
+        const findKey = Object.keys(semuaPenjualan || {}).find(key => 
+            semuaPenjualan[key].nomor_invoice === targetInvoice
+        );
+
+        if (findKey) {
+            // 3. Ambil item lama untuk hitung subtotal baru
+            const itemLama = semuaPenjualan[findKey].items[indexItem];
+            if (!itemLama) {
+                alert("Item tidak ditemukan di data penjualan!");
+                return;
+            }
+
+            const qty = parseFloat(itemLama.qty || 0);
+            const subtotalBaru = qty * hargaBaru;
+
+            // 4. Update ke Firebase (Gunakan sub_total sesuai database Anda)
+            const updatePath = `Riwayat_Penjualan/${findKey}/items/${indexItem}`;
+            await db.ref(updatePath).update({
+                harga: hargaBaru,
+                sub_total: subtotalBaru
+            });
+
+            // 5. Feedback & Render Ulang
+            const statusLabel = document.getElementById('status-update');
+            if (statusLabel) {
+                statusLabel.style.display = 'block';
+                setTimeout(() => { statusLabel.style.display = 'none'; }, 3000);
+            }
+            
+            alert("Harga berhasil diperbarui!");
+            
+            // Render ulang preview agar harga baru langsung terlihat
+            renderPreviewHistori(id); 
+
+            // Kosongkan input harga setelah sukses
+            document.getElementById('edit-harga-baru').value = "";
+        } else {
+            alert("Gagal: Data Riwayat_Penjualan dengan nomor " + targetInvoice + " tidak ditemukan.");
+        }
+
+    } catch (err) {
+        console.error("Gagal update:", err);
+        alert("Gagal memperbarui data: " + err.message);
+    }
+}
+
+
+async function tambahItemKeHistori() {
+    const idKirim = window.HistoriApp.idTerpilih;
+    const nama = document.getElementById('add-nama-item').value.toUpperCase();
+    const qty = parseFloat(document.getElementById('add-qty-item').value);
+    const satuan = document.getElementById('add-satuan-item').value.toUpperCase() || 'KG';
+    const harga = parseFloat(document.getElementById('add-harga-item').value);
+
+    if (!idKirim || !nama || isNaN(qty) || isNaN(harga)) {
+        alert("Isi Nama, Qty, dan Harga!");
+        return;
+    }
+
+    try {
+        const snapKirim = await db.ref(`history_pengiriman/${idKirim}`).once('value');
+        const dataKirim = snapKirim.val();
+        
+        const noSJ = dataKirim.header.no_surat_jalan;
+        const targetInvoice = noSJ.includes('SJ-') ? noSJ.replace('SJ-', 'MG ') : "MG " + noSJ;
+        
+        const snapSemuaJual = await db.ref(`Riwayat_Penjualan`).once('value');
+        const semuaJual = snapSemuaJual.val();
+        const idJual = Object.keys(semuaJual || {}).find(k => semuaJual[k].nomor_invoice === targetInvoice.trim());
+
+        if (!idJual) {
+            alert("Data Penjualan tidak ketemu!");
+            return;
+        }
+
+        // --- KUNCI PERBAIKAN: Menentukan Index yang Sama ---
+        // Kita cek berapa item yang sudah ada di Riwayat Penjualan
+        const currentItems = semuaJual[idJual].items || [];
+        const nextIndex = Array.isArray(currentItems) ? currentItems.length : Object.keys(currentItems).length;
+
+        const updates = {};
+        const subtotal = qty * harga;
+
+        // Simpan ke Pengiriman dengan Index Angka (0, 1, 2...)
+        updates[`history_pengiriman/${idKirim}/items/${nextIndex}`] = {
+            nama: nama,
+            qty: qty,
+            satuan: satuan
+        };
+
+        // Simpan ke Penjualan dengan Index Angka yang sama (0, 1, 2...)
+        updates[`Riwayat_Penjualan/${idJual}/items/${nextIndex}`] = {
+            nama: nama,
+            qty: qty,
+            satuan: satuan,
+            harga: harga,
+            sub_total: subtotal
+        };
+
+        await db.ref().update(updates);
+
+        alert("Item Berhasil Ditambah di Baris Terakhir!");
+        
+        // Bersihkan Form
+        document.getElementById('add-nama-item').value = '';
+        document.getElementById('add-qty-item').value = '';
+        document.getElementById('add-harga-item').value = '';
+        
+        renderPreviewHistori(idKirim);
+
+    } catch (err) {
+        alert("Gagal: " + err.message);
+    }
+}
+
+async function resetDanBersihkanItem() {
+    const idKirim = window.HistoriApp.idTerpilih;
+    
+    // Proteksi agar tidak salah klik
+    if (!idKirim) {
+        alert("Pilih nota yang akan diperbaiki terlebih dahulu!");
+        return;
+    }
+
+    const konfirmasi = confirm("PERINGATAN!\n\nSemua item barang di nota ini akan DIHAPUS agar urutannya bisa dirapikan ulang.\n\nApakah Anda yakin?");
+    
+    if (!konfirmasi) return;
+
+    try {
+        // 1. Ambil data untuk mencari link ke Riwayat_Penjualan
+        const snapKirim = await db.ref(`history_pengiriman/${idKirim}`).once('value');
+        const dataKirim = snapKirim.val();
+        
+        if (!dataKirim || !dataKirim.header) {
+            alert("Data header tidak ditemukan.");
+            return;
+        }
+
+        const noSJ = dataKirim.header.no_surat_jalan;
+        let targetInvoice = noSJ.includes('SJ-') ? noSJ.replace('SJ-', 'MG ') : "MG " + noSJ;
+        targetInvoice = targetInvoice.trim();
+
+        // 2. Cari ID Penjualan di folder Riwayat_Penjualan
+        const snapSemuaJual = await db.ref(`Riwayat_Penjualan`).once('value');
+        const semuaJual = snapSemuaJual.val();
+        const idJual = Object.keys(semuaJual || {}).find(k => semuaJual[k].nomor_invoice === targetInvoice);
+
+        // 3. Eksekusi Penghapusan (Atomic Update)
+        const updates = {};
+        
+        // Hapus items di Pengiriman
+        updates[`history_pengiriman/${idKirim}/items`] = null;
+        
+        // Hapus items di Penjualan (Jika ditemukan)
+        if (idJual) {
+            updates[`Riwayat_Penjualan/${idJual}/items`] = null;
+            // Jika Anda punya field total_omzet, sebaiknya di-nol-kan juga
+            updates[`Riwayat_Penjualan/${idJual}/total_omzet`] = 0;
+        }
+
+        await db.ref().update(updates);
+
+        alert("BERHASIL! Item telah dibersihkan.\nSekarang silakan tambahkan kembali item barang satu per satu.");
+        
+        // Render ulang agar tampilan kosong dan siap diisi
+        renderPreviewHistori(idKirim);
+
+    } catch (err) {
+        console.error("Error Reset:", err);
+        alert("Gagal membersihkan data: " + err.message);
+    }
+}
+
+async function updateHeaderHistori() {
+    const idKirim = window.HistoriApp.idTerpilih;
+    const noSJBaru = document.getElementById('edit-no-sj').value.trim();
+    const tglBaru = document.getElementById('edit-tanggal').value;
+    const custBaru = document.getElementById('edit-customer').value.trim().toUpperCase();
+
+    if (!idKirim || !noSJBaru || !tglBaru || !custBaru) {
+        alert("Semua data header harus diisi!");
+        return;
+    }
+
+    try {
+        // 1. Cari data pengiriman lama untuk mendapatkan target invoice
+        const snapKirim = await db.ref(`history_pengiriman/${idKirim}`).once('value');
+        const dataKirimLama = snapKirim.val();
+        const noSJLama = dataKirimLama.header.no_surat_jalan;
+        
+        // Cari Key di Riwayat_Penjualan
+        const targetInvoiceLama = noSJLama.includes('SJ-') ? noSJLama.replace('SJ-', 'MG ') : "MG " + noSJLama;
+        const snapSemuaJual = await db.ref(`Riwayat_Penjualan`).once('value');
+        const semuaJual = snapSemuaJual.val();
+        const idJual = Object.keys(semuaJual || {}).find(k => semuaJual[k].nomor_invoice === targetInvoiceLama.trim());
+
+        // 2. Siapkan nomor invoice baru (Jika no SJ berubah)
+        const noInvBaru = noSJBaru.includes('SJ-') ? noSJBaru.replace('SJ-', 'MG ') : "MG " + noSJBaru;
+
+        const updates = {};
+
+        // Update di history_pengiriman
+        updates[`history_pengiriman/${idKirim}/header/no_surat_jalan`] = noSJBaru;
+        updates[`history_pengiriman/${idKirim}/header/tanggal_kirim`] = tglBaru;
+        updates[`history_pengiriman/${idKirim}/header/customer`] = custBaru;
+
+        // Update di Riwayat_Penjualan (jika data penjualannya ketemu)
+        if (idJual) {
+            updates[`Riwayat_Penjualan/${idJual}/nomor_invoice`] = noInvBaru;
+            updates[`Riwayat_Penjualan/${idJual}/tanggal_penjualan`] = tglBaru; // sesuaikan nama field tgl di penjualan
+            updates[`Riwayat_Penjualan/${idJual}/customer`] = custBaru;
+        }
+
+        await db.ref().update(updates);
+
+        alert("Data Header Berhasil Diperbarui!");
+        renderPreviewHistori(idKirim); // Render ulang preview
+
+    } catch (err) {
+        console.error(err);
+        alert("Gagal update header: " + err.message);
+    }
+}
+
 function renderUlangInvoice(data, container) {
     if (!data) return;
 
-    // --- 1. PENYESUAIAN PENGAMBILAN DATA (Langsung dari root data) ---
-    // Karena di Riwayat_Penjualan tidak ada property .header
-    let noSJFinal = data.nomor_invoice || "-";
-    
-    // Logika penomoran (Identik dengan kode Anda)
-    if (noSJFinal.length > 12) {
-        const cleanNumber = noSJFinal.replace('SJ-', '');
-        noSJFinal = 'MG-' + cleanNumber.substring(cleanNumber.length - 5);
+    // --- 1. IDENTIFIKASI NOMOR (Sinkron dengan SJ) ---
+    let noFinal = data.header?.no_surat_jalan || data.nomor_invoice || "-";
+    if (noFinal.length > 12) {
+        const cleanNumber = noFinal.replace('SJ-', '');
+        noFinal = 'MG-' + cleanNumber.substring(cleanNumber.length - 5);
     } else {
-        noSJFinal = noSJFinal.replace('SJ-', 'MG-').replace('SJ', 'MG');
+        noFinal = noFinal.replace('SJ-', 'MG-').replace('SJ', 'MG');
     }
 
-    // Ambil data sejajar dengan nomor_invoice
-    const tglInput = data.tanggal || "";
-    const namaCust = data.customer || "PELANGGAN UMUM";
-    const alamatCust = data.alamat || "SIDOARJO / SURABAYA";
+    // --- 2. DATA HEADER ---
+    const tglInput = data.header?.tanggal_kirim || data.tanggal || "";
+    const namaCust = data.header?.customer || data.customer || "PELANGGAN UMUM";
+    const alamatCust = data.header?.alamat || data.alamat || "SIDOARJO / SURABAYA";
 
-    // --- 2. LOGIKA TANGGAL ---
+    // --- 3. LOGIKA TANGGAL ---
     let tglTeks = "-";
     if (tglInput) {
         const d = new Date(tglInput);
         const daftarBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
-        tglTeks = `SIDOARJO, ${d.getDate()} ${daftarBulan[d.getMonth()]} ${d.getFullYear()}`;
+        if(!isNaN(d.getTime())) {
+            tglTeks = `SIDOARJO, ${d.getDate()} ${daftarBulan[d.getMonth()]} ${d.getFullYear()}`;
+        }
     }
 
-    // --- 3. AMBIL ITEMS ---
-    const itemsRaw = data.items || {};
-    const itemsSiap = Object.values(itemsRaw);
+    // --- 4. AMBIL ITEMS ---
+    const itemsSiap = Object.values(data.items || {});
 
-    // --- 4. LOGIKA PAGING ---
-    const perHalaman = 5;
+    // --- 5. LOGIKA PAGING (Otomatis ikut Config, misal 8 baris) ---
+    const perHalaman = PRINT_SETTINGS.barisPerHalaman;
     const kumpulanHalaman = [];
     for (let i = 0; i < itemsSiap.length; i += perHalaman) {
         kumpulanHalaman.push(itemsSiap.slice(i, i + perHalaman));
@@ -2642,170 +2856,18 @@ function renderUlangInvoice(data, container) {
 
     container.innerHTML = '';
     
+    // --- 6. RENDER DENGAN MASTER TEMPLATE ---
     kumpulanHalaman.forEach((halamanItems, index) => {
-        const hlmKe = index + 1;
-        const totalHlm = kumpulanHalaman.length;
-        let rowsHtml = '';
-        let grandTotalHalaman = 0;
+        const payload = {
+            no_sj: noFinal,
+            tgl_teks: tglTeks,
+            nama_cust: namaCust.toUpperCase(),
+            alamat_cust: alamatCust
+        };
 
-        halamanItems.forEach((item, idx) => {
-            const noUrut = (index * perHalaman) + (idx + 1);
-            const qty = parseFloat(item.qty || 0);
-            const harga = parseFloat(item.harga || 0); // Ambil harga dari Firebase
-            const subtotal = item.subtotal || (qty * harga);
-            grandTotalHalaman += subtotal;
-
-            rowsHtml += `
-                <tr>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: center;">${noUrut}</td>
-                    <td style="border: 1px solid #000; padding: 8px 12px; text-transform: uppercase;">${item.nama}</td>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: center;">${qty} ${item.satuan || 'KG'}</td>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: right;">Rp ${harga.toLocaleString('id-ID')}</td>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: right;">Rp ${subtotal.toLocaleString('id-ID')}</td>
-                </tr>`;
-        });
-
-        // Baris kosong
-        for (let i = halamanItems.length; i < perHalaman; i++) {
-            rowsHtml += `<tr><td style="border: 1px solid #000; padding: 18px;">&nbsp;</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
-        }
-
-        // --- 5. RENDER LAYOUT INVOICE (Identik dengan tampilan SJ tapi kolom Invoice) ---
-        container.innerHTML += `
-            <div class="halaman-invoice-print" style="${index > 0 ? 'page-break-before: always;' : ''} width: 100%; color: #000; font-family: Arial, sans-serif; background: white; padding: 25px; box-sizing: border-box;">
-                
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                    <div style="flex: 1;">
-                        <img src="Logo.png" alt="Logo" style="height: 100px; object-fit: contain; margin-bottom: 5px;">
-                        <div style="font-size: 11px; line-height: 1.3;">
-                            <strong style="font-size: 14px;">MAYUR GROCERIES</strong><br>
-                            Mandiri Residence Blok G4 No. 11 Krian - Sidoarjo<br>
-                            wiwitdianasari@gmail.com | 0858 4347 4469
-                        </div>
-                    </div>
-
-                    <div style="flex: 1; text-align: center; padding-top: 10px;">
-                        <h3 style="margin: 0; font-weight: bold; text-decoration: underline; font-size: 20px; letter-spacing: 2px;">INVOICE</h3>
-                        <small style="font-size: 11px;">Halaman ${hlmKe} dari ${totalHlm}</small>
-                    </div>
-
-                    <div style="flex: 1; display: flex; justify-content: flex-end;">
-                        <div style="text-align: left; min-width: 200px;">
-                            <div style="font-size: 16px; font-weight: bold; padding: 8px; border: 2.5px solid #000; margin-bottom: 10px; text-align: center;">
-                                NO. MG: ${noSJFinal}
-                            </div>
-                            <div style="font-weight: bold; font-size: 13px;">${tglTeks}</div>
-                            <div style="font-size: 13px; margin-top: 5px;">
-                                <strong>Kepada Yth.</strong><br>
-                                <span style="text-transform: uppercase; font-weight: bold;">${namaCust}</span><br>
-                                <div style="line-height: 1.2;">${alamatCust}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 13px; margin-top: 30px;">
-                    <thead>
-                        <tr style="text-align: center; background-color: #f2f2f2;">
-                            <th style="border: 1px solid #000; padding: 10px; width: 50px;">NO</th>
-                            <th style="border: 1px solid #000; padding: 10px;">NAMA BARANG</th>
-                            <th style="border: 1px solid #000; padding: 10px; width: 100px;">JUMLAH</th>
-                            <th style="border: 1px solid #000; padding: 10px; width: 120px;">HARGA</th>
-                            <th style="border: 1px solid #000; padding: 10px; width: 120px;">SUBTOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rowsHtml}</tbody>
-                    <tfoot>
-                        <tr style="font-weight: bold; background: #f9f9f9;">
-                            <td colspan="4" style="border: 1px solid #000; padding: 10px; text-align: right;">GRAND TOTAL :</td>
-                            <td style="border: 1px solid #000; padding: 10px; text-align: right;">Rp ${grandTotalHalaman.toLocaleString('id-ID')}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-
-                <div style="margin-top: 15px; font-size: 11px;">
-                    <strong>Pembayaran via Transfer:</strong> BCA 0123456789 a/n Wiwit Diana Sari
-                </div>
-
-                <table style="width: 100%; margin-top: 30px; text-align: center; font-size: 13px; border: none !important;">
-                    <tr>
-                        <td style="border: none !important; width: 33%;">Dibuat Oleh,<br><br><br><br>( <strong>Firman Agung</strong> )</td>
-                        <td style="border: none !important; width: 33%;">Diperiksa Oleh,<br><br><br><br>( <strong>Wiwit Diana Sari</strong> )</td>
-                        <td style="border: none !important; width: 33%;">Penerima,<br><br><br><br>( .......................... )</td>
-                    </tr>
-                </table>
-            </div>`;
+        // Panggil Mesin Cetak untuk Invoice
+        container.innerHTML += generatePrintTemplate('INV', payload, index, kumpulanHalaman.length, halamanItems);
     });
-}
-
-function cetakHistoriSJ() {
-    // 1. Ambil konten HTML yang sudah di-render oleh JS kamu
-    const kontenSJ = document.getElementById('area-preview-histori').innerHTML;
-
-    // Cek apakah data sudah dipilih
-    if (kontenSJ.includes("Pilih data") || kontenSJ.trim() === "") {
-        alert("Silakan pilih data histori terlebih dahulu!");
-        return;
-    }
-
-    // 2. Buka jendela baru (Pop-up)
-    const printWindow = window.open('', '_blank', 'width=900,height=600');
-
-    // 3. Masukkan HTML Lengkap ke jendela baru
-    printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Cetak Surat Jalan - Mayur Groceries</title>
-            <style>
-                /* Reset Dasar */
-                body { margin: 0; padding: 0; background: #fff; }
-                
-                /* Pengaturan Kertas A5 Landscape */
-                @page { 
-                    size: A5 landscape; 
-                    margin: 0; 
-                }
-
-                /* CSS Tambahan agar tampilan sama persis dengan render kamu */
-                .halaman-surat-jalan-print {
-                    width: 100%;
-                    height: 100%;
-                    padding: 20px;
-                    box-sizing: border-box;
-                    page-break-after: always;
-                }
-
-                table { width: 100%; border-collapse: collapse; }
-                th, td { border: 1px solid #000 !important; }
-                
-                /* Pastikan tabel tanda tangan tidak punya border */
-                table[style*="border: none"] td, 
-                table[style*="border: none !important"] td {
-                    border: none !important;
-                }
-
-                /* Paksa Gambar Muncul */
-                img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            </style>
-        </head>
-        <body>
-            ${kontenSJ}
-            <script>
-                // Tunggu konten (termasuk gambar logo) selesai dimuat
-                window.onload = function() {
-                    window.print();
-                    // Menutup jendela otomatis setelah print selesai atau dibatalkan
-                    window.onafterprint = function() {
-                        window.close();
-                    };
-                };
-            <\/script>
-        </body>
-        </html>
-    `);
-
-    printWindow.document.close();
 }
 
 async function shareGambar(idElemen, judulFile) {
@@ -2890,6 +2952,84 @@ async function ambilScreenshotSJ() {
     }
 }
 
+
+function cetakHistoriSJ() {
+    const previewArea = document.getElementById('area-preview-histori');
+    const title = document.getElementById('previewTitle').innerText;
+
+    if (!previewArea || previewArea.innerText.includes("Pilih data")) {
+        alert("Silakan pilih data terlebih dahulu sebelum mencetak!");
+        return;
+    }
+
+    // 1. Ambil konten bersih (tanpa tombol jika ada di dalam)
+    const printContents = previewArea.innerHTML;
+
+    // 2. Buka jendela cetak
+    const printWindow = window.open('', '_blank', 'width=900,height=800');
+    
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>${title}</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                @media print {
+                    @page { 
+                        size: A4; 
+                        margin: 10mm; 
+                    }
+                    body { 
+                        -webkit-print-color-adjust: exact; 
+                        print-color-adjust: exact; 
+                        background-color: white !important;
+                    }
+                    .no-print { display: none !important; }
+                }
+                
+                body { 
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    padding: 0;
+                    margin: 0;
+                    background-color: white !important;
+                }
+
+                /* Menghilangkan efek scaling preview agar pas di kertas A4 */
+                #area-preview-histori {
+                    transform: none !important;
+                    width: 100% !important;
+                    box-shadow: none !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+
+                table { width: 100% !important; border-collapse: collapse; }
+                th, td { border: 1px solid #000 !important; padding: 6px !important; font-size: 12px; }
+                .text-success { color: #198754 !important; }
+            </style>
+        </head>
+        <body>
+            <div style="width: 100%;">
+                ${printContents}
+            </div>
+            <script>
+                window.onload = function() {
+                    setTimeout(() => {
+                        window.print();
+                        window.close();
+                    }, 500); // Beri jeda agar CSS Bootstrap ter-load
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+}
+
+
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------
 
 // Variabel global untuk menampung link
 let urlAksesKaryawan = "";
