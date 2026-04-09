@@ -67,11 +67,13 @@ const PRINT_SETTINGS = {
     fontDasar: "12pt",       // Pilihan aman untuk 8 baris A5
     fontJudul: "20pt", 
     fontNomorMG: "16pt",
-    fontKecil:"10pt",
+    fontKecil:"9pt",
     barisPerHalaman: 8,
     namaToko: "MAYUR GROCERIES",
-    alamatToko: "Mandiri Residence Blok G4 No. 11 Krian",
-    kontakToko: "0858 4347 4469"
+    alamatToko: "Mandiri Residence G4 No. 11",
+    alamatToko2: "Krian, Sidoarjo",
+    kontakToko: "0858 4347 4469",
+    emailToko: "wiwitdianasari@gmail.com"
 };
 
 function generatePrintTemplate(type, data, index, totalHlm, hlmItems) {
@@ -139,7 +141,9 @@ function generatePrintTemplate(type, data, index, totalHlm, hlmItems) {
                 <div style="flex: 1.2;">
                     <div style="line-height: 1.2; font-size: ${PRINT_SETTINGS.fontKecil};">
                         ${PRINT_SETTINGS.alamatToko}<br>
-                        ${PRINT_SETTINGS.kontakToko}
+                        ${PRINT_SETTINGS.alamatToko2}<br>
+                        ${PRINT_SETTINGS.kontakToko}<br>
+                        ${PRINT_SETTINGS.emailToko}
                     </div>
                 </div>
                 
@@ -1601,31 +1605,111 @@ function updateStep(itemId, stepKey, val) {
     db.ref("belanja/" + itemId).update(updateData);
 }
 
-// --- LOGIKA PEMBATASAN AKSES KARYAWAN ---
+// --- LOGIKA PEMBATASAN AKSES & INISIALISASI HALAMAN ---
 window.addEventListener('load', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const viewMode = urlParams.get('view');
 
-    if (viewMode === 'karyawan') {
-        // 1. Sembunyikan Navigasi Tab Admin & Tombol Keluar
-        document.getElementById('pills-tab').style.display = 'none';
-        document.querySelector('button[onclick="logout()"]').style.display = 'none';
-        
-        // 2. Sembunyikan Header Judul agar lebih luas di HP (Opsional)
-        // document.querySelector('.mb-4.border-bottom').style.display = 'none';
+    // 1. Set Default Tanggal untuk Input Pesanan Customer (Hanya muncul di sisi Admin)
+    const custTglInput = document.getElementById('custTanggal');
+    if (custTglInput) {
+        custTglInput.value = new Date().toISOString().split('T')[0];
+    }
 
-        // 3. Paksa aplikasi langsung membuka Tab Rundown
+    // 2. Cek jika yang masuk adalah Karyawan via link khusus (?view=karyawan)
+    if (viewMode === 'karyawan') {
+        // A. Sembunyikan Navigasi Tab Admin & Tombol Keluar
+        const navTab = document.getElementById('pills-tab');
+        const logoutBtn = document.querySelector('button[onclick="logout()"]');
+        if (navTab) navTab.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+
+        // B. Sembunyikan Kontrol Input Admin (Form Pesanan & Edit SOP)
+        const sectionAdminInput = document.getElementById('section-admin-input');
+        const btnEditSop = document.getElementById('btn-edit-sop');
+        if (sectionAdminInput) sectionAdminInput.style.display = 'none';
+        if (btnEditSop) btnEditSop.style.display = 'none';
+
+        // C. Paksa aplikasi langsung membuka Tab Rundown
         const rundownTabTrigger = document.querySelector('[data-bs-target="#tab-rundown"]');
         if (rundownTabTrigger) {
             const tab = new bootstrap.Tab(rundownTabTrigger);
             tab.show();
         }
 
-        // 4. Ubah Judul agar Karyawan tahu ini halaman tugas mereka
-        const titleEl = document.querySelector('h2.fw-bold');
+        // D. Ubah Judul agar Karyawan tahu ini halaman tugas mereka
+        // Kita coba cari ID spesifik, jika tidak ada baru cari h2/h5
+        const titleEl = document.getElementById('title-rundown') || document.querySelector('h2.fw-bold');
         if (titleEl) titleEl.innerText = "Tugas Lapangan";
+
+        // E. (Opsional) Sembunyikan filter tanggal agar karyawan fokus ke hari ini
+        // const filterTgl = document.getElementById('filterTglRundown');
+        // if (filterTgl) filterTgl.closest('.d-flex').style.display = 'none';
     }
 });
+
+// --- FUNGSI UPDATE SOP ---
+// Fungsi untuk mengirim Pengumuman/SOP ke Firebase
+function updateSOP() {
+    const inputEl = document.getElementById('inputSOP');
+    const teks = inputEl.value.trim();
+
+    if (!teks) {
+        return alert("Silakan isi pengumuman terlebih dahulu!");
+    }
+
+    // Menampilkan loading sederhana pada tombol
+    const btn = document.querySelector('#collapseEditSOP button');
+    const originalText = btn.innerText;
+    btn.innerText = "Menyimpan...";
+    btn.disabled = true;
+
+    db.ref("settings/announcement").set({
+        isi: teks,
+        lastUpdate: new Date().getTime() // Untuk mencatat waktu update terakhir
+    })
+    .then(() => {
+        alert("✅ Pengumuman berhasil diperbarui!");
+        
+        // Tutup kotak input secara otomatis setelah sukses
+        const collapseEl = document.getElementById('collapseEditSOP');
+        const bsCollapse = bootstrap.Collapse.getInstance(collapseEl) || new bootstrap.Collapse(collapseEl);
+        bsCollapse.hide();
+    })
+    .catch((error) => {
+        console.error("Gagal update SOP:", error);
+        alert("Gagal menyimpan pengumuman.");
+    })
+    .finally(() => {
+        // Kembalikan tombol ke keadaan semula
+        btn.innerText = originalText;
+        btn.disabled = false;
+    });
+}
+
+// Menampilkan Pengumuman secara Real-time
+db.ref("settings/announcement").on("value", (snap) => {
+    const data = snap.val();
+    const display = document.getElementById('displaySOP');
+    const inputArea = document.getElementById('inputSOP');
+    
+    if (display) {
+        display.innerText = data ? data.isi : "Belum ada pengumuman hari ini.";
+    }
+    
+    // Opsional: Isi otomatis textarea dengan pesan yang sedang aktif
+    if (inputArea && data) {
+        inputArea.value = data.isi;
+    }
+});
+
+function toggleEditSOP() {
+    const element = document.getElementById('collapseEditSOP');
+    const bsCollapse = new bootstrap.Collapse(element, {
+        toggle: true
+    });
+}
+
 
 // --- SISTEM NOTIFIKASI ADMIN ---
 const notifSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -1667,6 +1751,213 @@ db.ref("belanja").on("child_changed", (snapshot) => {
         }, 4000);
     }
 });
+
+// Variabel global untuk menampung link
+let urlAksesKaryawan = "";
+
+// 1. Fungsi Utama untuk Membuka Modal
+function shareKaryawanLink() {
+    // Membuat URL otomatis: namafile.html?view=karyawan
+    urlAksesKaryawan = window.location.origin + window.location.pathname + "?view=karyawan";
+    
+    const inputEl = document.getElementById('inputLinkKaryawan');
+    const modalEl = document.getElementById('modalShareKaryawan');
+
+    if (inputEl && modalEl) {
+        inputEl.value = urlAksesKaryawan;
+        
+        // Inisialisasi dan Tampilkan Modal
+        const myModal = new bootstrap.Modal(modalEl);
+        myModal.show();
+    } else {
+        console.error("Elemen modal atau input tidak ditemukan!");
+    }
+}
+
+// 2. Fungsi Copy Link ke Clipboard
+function copyLinkKaryawan(btn) {
+    const input = document.getElementById('inputLinkKaryawan');
+    
+    // Gunakan Clipboard API modern
+    navigator.clipboard.writeText(input.value).then(() => {
+        // Feedback visual sederhana
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Siap!';
+        btn.classList.replace('btn-primary', 'btn-dark');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.classList.replace('btn-dark', 'btn-primary');
+        }, 2000);
+    }).catch(err => {
+        console.error("Gagal menyalin: ", err);
+    });
+}
+
+// 3. Fungsi Kirim WhatsApp
+function shareKeWA() {
+    const pesan = encodeURIComponent("Halo Tim, berikut link rundown pekerjaan Mayur Groceries hari ini: " + urlAksesKaryawan);
+    window.open(`https://wa.me/?text=${pesan}`, '_blank');
+}
+
+
+//--------------------------------------------------------------Tambahan fitur baru Halaman Rundown --------------------------------------------------------------
+
+// --- FUNGSI SOP GLOBAL ---
+function updateSOP() {
+    const teks = document.getElementById('inputSOP').value;
+    if(!teks) return alert("Isi pengumuman dulu!");
+    
+    db.ref("settings/announcement").set({
+        isi: teks,
+        updatedAt: new Date().toLocaleString()
+    }).then(() => {
+        bootstrap.Collapse.getInstance(document.getElementById('collapseEditSOP')).hide();
+    });
+}
+
+// Listener SOP agar Live di Karyawan
+// 1. Variabel Global untuk menyimpan data karyawan terakhir agar bisa diakses fungsi tambahBaris
+window.lastKaryawanData = null;
+
+// 2. Listener Papan Pengumuman (SOP) - Real-time
+db.ref("settings/announcement").on("value", (snap) => {
+    const data = snap.val();
+    const display = document.getElementById('displaySOP');
+    if (display) {
+        display.innerText = data ? data.isi : "Belum ada pengumuman hari ini.";
+    }
+});
+
+// 3. Listener Karyawan (Tersambung ke Master)
+db.ref("karyawan").on("value", (snapshot) => {
+    const data = snapshot.val();
+    window.lastKaryawanData = data; // Simpan ke variabel global
+    
+    // Panggil fungsi update dropdown (untuk baris yang sudah ada)
+    updateDropdownKaryawan(data);
+});
+
+// 4. Fungsi Sinkronisasi Dropdown Petugas
+function updateDropdownKaryawan(data) {
+    const options = '<option value="">Pilih Petugas...</option>' + 
+                   (data ? Object.values(data).map(v => `<option value="${v.nama}">${v.nama}</option>`).join('') : '');
+    
+    // Update semua dropdown petugas yang sedang tampil di Rundown
+    const dropdownsRundown = document.querySelectorAll('.inp-petugas');
+    dropdownsRundown.forEach(select => {
+        const currentVal = select.value;
+        select.innerHTML = options;
+        select.value = currentVal; // Agar pilihan tidak reset saat data berubah
+    });
+}
+
+// 5. Fungsi Input Pesanan Customer Dinamis
+let barisCount = 0;
+function tambahBarisItem() {
+    barisCount++;
+    const container = document.getElementById('container-input-item');
+    
+    // Generate opsi karyawan secara dinamis dari data Master
+    let opsiKaryawan = '<option value="">Petugas...</option>';
+    if (window.lastKaryawanData) {
+        Object.values(window.lastKaryawanData).forEach(k => {
+            opsiKaryawan += `<option value="${k.nama}">${k.nama}</option>`;
+        });
+    }
+
+    const html = `
+        <div class="row g-2 mb-1" id="row-${barisCount}">
+            <div class="col-6">
+                <input type="text" class="form-control form-control-sm inp-nama" placeholder="Nama Barang">
+            </div>
+            <div class="col-2">
+                <input type="number" class="form-control form-control-sm inp-qty" placeholder="Qty">
+            </div>
+            <div class="col-3">
+                <select class="form-select form-select-sm inp-petugas">
+                    ${opsiKaryawan}
+                </select>
+            </div>
+            <div class="col-1 text-end">
+                <button class="btn btn-sm btn-outline-danger border-0" onclick="hapusBarisItem('${barisCount}')">✕</button>
+            </div>
+        </div>`;
+    
+    if (container) {
+        container.insertAdjacentHTML('beforeend', html);
+    } else {
+        console.error("Container 'container-input-item' tidak ditemukan!");
+    }
+}
+
+// 6. Fungsi Hapus Baris
+function hapusBarisItem(id) {
+    const row = document.getElementById(`row-${id}`);
+    if (row) row.remove();
+}
+
+function hapusBarisItem(id) {
+    document.getElementById(`row-${id}`).remove();
+}
+
+function prosesPesananBaru() {
+    const judul = document.getElementById('custJudul').value;
+    const tanggal = document.getElementById('custTanggal').value;
+    const rows = document.querySelectorAll('#container-input-item .row');
+
+    if(!judul || !tanggal || rows.length === 0) return alert("Lengkapi data pesanan!");
+
+    rows.forEach(row => {
+        const nama = row.querySelector('.inp-nama').value;
+        const qty = row.querySelector('.inp-qty').value;
+        const petugas = row.querySelector('.inp-petugas').value;
+
+        if(nama && qty && petugas) {
+            db.ref("belanja").push({
+                nama: `[CUST] ${judul} - ${nama}`,
+                jumlah: parseFloat(qty),
+                petugas: petugas,
+                tanggal: tanggal,
+                statusAlur: "Diterima",
+                step1: false, step2: false, step3: false
+            });
+        }
+    });
+    
+    alert("Pesanan berhasil masuk ke Rundown!");
+    document.getElementById('container-input-item').innerHTML = '';
+    document.getElementById('custJudul').value = '';
+}
+
+function updateDropdownKaryawan(data) {
+    // 1. Dropdown di halaman Master (ID: selectPetugas)
+    const s = document.getElementById('selectPetugas');
+    const options = '<option value="">Pilih Petugas...</option>' + 
+                   (data ? Object.values(data).map(v => `<option value="${v.nama}">${v.nama}</option>`).join('') : '');
+    
+    if(s) s.innerHTML = options;
+
+    // 2. Integrasi ke Rundown: Isi dropdown petugas di form "Pesanan Customer"
+    // Kita cari semua select yang punya class 'inp-petugas'
+    const dropdownsRundown = document.querySelectorAll('.inp-petugas');
+    dropdownsRundown.forEach(select => {
+        // Simpan nilai yang sedang dipilih agar tidak reset saat ada karyawan baru
+        const currentVal = select.value;
+        select.innerHTML = options;
+        select.value = currentVal;
+    });
+}
+
+
+
+
+
+
+
+
+
+
 
 //---------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -2371,6 +2662,12 @@ function updateHargaMaster(itemId, hargaPokok, markup) {
 async function prosesCetakDanPotongStok() {
     const tglManual = document.getElementById('sj_tanggal')?.value;
     const noSJManual = document.getElementById('sj_nomor')?.value;
+    
+    // --- TAMBAHAN: Ambil Nama Customer untuk kartu logistik ---
+    const namaCustManual = document.getElementById('sj_nama_customer')?.value || 
+                           document.getElementById('sj_nama_customer')?.innerText || 
+                           "Customer Umum";
+
     const containerUtama = document.getElementById('area-cetak'); // Area yang berisi surat jalan
 
     if (!tglManual || !noSJManual) {
@@ -2388,7 +2685,6 @@ async function prosesCetakDanPotongStok() {
     }
 
     // --- KUNCI: SIMPAN HTML AREA CETAK SEKARANG ---
-    // Kita simpan tampilan yang saat ini ada di layar ke variabel agar tidak hilang saat data diupdate
     const htmlLama = containerUtama.innerHTML;
 
     try {
@@ -2401,6 +2697,8 @@ async function prosesCetakDanPotongStok() {
         for (const item of itemsSiap) {
             if (!item.idMaster || item.idMaster === "-") continue;
             const masterPath = `master_items/${item.idMaster}`;
+            
+            // Menggunakan transaksi/get untuk ambil stok terbaru
             const snapshot = await db.ref(masterPath).get();
 
             if (snapshot.exists()) {
@@ -2408,7 +2706,10 @@ async function prosesCetakDanPotongStok() {
                 const stokSekarang = Number(dataMaster.stok_tersedia || 0);
                 const qtyKeluar = Number(item.qtyBersih || 0);
                 
+                // 1. Update Stok di Master
                 updates[`${masterPath}/stok_tersedia`] = stokSekarang - qtyKeluar;
+                
+                // 2. Update status di node Belanja
                 updates[`belanja/${item.id}/statusAlur`] = "Sudah Dikirim"; 
                 updates[`belanja/${item.id}/status_sj`] = "dikirim";
                 updates[`belanja/${item.id}/stokSudahDipotong`] = true;
@@ -2416,37 +2717,268 @@ async function prosesCetakDanPotongStok() {
                 updates[`belanja/${item.id}/tanggalKirimAktual`] = tglManual; 
                 updates[`belanja/${item.id}/idPengiriman`] = idPengiriman;
 
+                // 3. Masukkan ke history item pengiriman
                 updates[`history_pengiriman/${idPengiriman}/items/${item.id}`] = {
-                    nama: item.nama, qty: qtyKeluar, idMaster: item.idMaster, idBelanja: item.id
+                    nama: item.nama, 
+                    qty: qtyKeluar, 
+                    idMaster: item.idMaster, 
+                    idBelanja: item.id
                 };
             }
         }
 
-        updates[`history_pengiriman/${idPengiriman}/header`] = {
-            no_surat_jalan: noSJManual, tanggal_kirim: tglManual, waktu_proses: waktuSkrg, total_item: itemsSiap.length
+        // --- TAMBAHAN: MODUL LOGISTIK (KARTU KURIR) ---
+        // Data ini yang akan dibaca oleh Listener Logistik
+        updates[`pengiriman/${idPengiriman}`] = {
+            idPengiriman: idPengiriman,
+            noSJ: noSJManual,
+            customer: namaCustManual,
+            statusKirim: "Loading",
+            tanggal: tglManual,
+            lastUpdate: waktuSkrg,
+            timestamp: timestamp
         };
 
-        // Jalankan Update
+        // 4. Update Header History
+        updates[`history_pengiriman/${idPengiriman}/header`] = {
+            no_surat_jalan: noSJManual, 
+            tanggal_kirim: tglManual, 
+            waktu_proses: waktuSkrg, 
+            total_item: itemsSiap.length,
+            customer: namaCustManual
+        };
+
+        // --- EKSEKUSI SEMUA UPDATE (ATOMIC) ---
         await db.ref().update(updates);
         
-        // --- KUNCI: PAKSA HTML TETAP ADA ---
-        // Walaupun Firebase sudah mengosongkan data, kita tempel kembali HTML yang sudah kita simpan tadi
+        // --- KUNCI: PAKSA HTML TETAP ADA AGAR BISA DICETAK ---
         containerUtama.innerHTML = htmlLama;
 
-        alert(`Berhasil! Klik OK untuk mulai mencetak.`);
+        alert(`Berhasil! Data Stok terpotong & Rundown Logistik dibuat.\nKlik OK untuk mulai mencetak.`);
         
-        // Cetak
+        // Cetak Halaman
         window.print();
 
-        // Setelah print selesai, baru bersihkan secara alami
+        // Refresh UI setelah cetak
         if (typeof renderPreviewSuratJalan === "function") {
             renderPreviewSuratJalan();
         }
 
     } catch (error) {
         console.error("Gagal Update Firebase:", error);
-        alert("Terjadi kesalahan sistem.");
+        alert("Terjadi kesalahan sistem saat memproses stok/logistik.");
     }
+}   
+
+
+function ambilFotoSJ(id) {
+    // Simpan ID pengiriman ke hidden input agar tahu foto ini milik siapa
+    document.getElementById('tempIdPengiriman').value = id;
+    // Pemicu klik pada input file
+    document.getElementById('inputFotoSJ').click();
+}
+
+async function prosesUploadFoto(input) {
+    const file = input.files[0];
+    const idKirim = document.getElementById('tempIdPengiriman').value;
+    
+    if (!file || !idKirim) return;
+
+    // Data Cloudinary Mas Firman
+    const CLOUD_NAME = "dz16gb8tw"; 
+    const UPLOAD_PRESET = "mayur groceries";
+
+    // Tampilkan indikator loading (opsional)
+    const btnUpload = document.querySelector(`button[onclick="ambilFotoSJ('${idKirim}')"]`);
+    if(btnUpload) btnUpload.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Loading...';
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", UPLOAD_PRESET);
+    formData.append("folder", "bukti_pengiriman"); // Akan membuat folder otomatis di Cloudinary
+
+    try {
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.secure_url) {
+            // Update link ke Firebase Realtime Database
+            await db.ref(`pengiriman/${idKirim}`).update({
+                fotoBukti: data.secure_url,
+                waktuSelesai: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                statusKirim: "Terkirim" // Otomatis set selesai jika sudah upload foto
+            });
+
+            alert("✅ Bukti pengiriman berhasil di simpan!");
+        } else {
+            console.error("Cloudinary Error:", data);
+            alert("Gagal upload: " + (data.error?.message || "Cek settingan Preset"));
+        }
+        
+    } catch (error) {
+        console.error("Network Error:", error);
+        alert("Koneksi bermasalah saat upload.");
+    } finally {
+        // Reset tombol jika gagal
+        if(btnUpload) btnUpload.innerHTML = '<i class="fas fa-camera me-1"></i> Upload Bukti';
+    }
+}
+
+
+// LISTENER LOGISTIK: Memantau dan Menampilkan Kartu
+db.ref("pengiriman").on("value", (snapshot) => {
+    const container = document.getElementById('logistik-container');
+    if (!container) return;
+
+    const data = snapshot.val();
+    const filterTgl = document.getElementById('filterTglRundown');
+    const tglFilter = filterTgl ? filterTgl.value : new Date().toISOString().split('T')[0];
+
+    if (!data) {
+        container.innerHTML = '<div class="col-12 text-center py-4 text-muted small">Belum ada pengiriman hari ini.</div>';
+        return;
+    }
+
+    let html = '';
+    const keys = Object.keys(data).reverse();
+
+    keys.forEach(id => {
+        const kirim = data[id];
+        if (kirim.tanggal !== tglFilter) return;
+
+        // Logika warna status
+        let statusColor = "bg-primary";
+        if (kirim.statusKirim === "OTW") statusColor = "bg-warning text-dark";
+        if (kirim.statusKirim === "Terkirim") statusColor = "bg-success text-white";
+
+        html += `
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="badge ${statusColor} rounded-pill px-3" style="font-size: 0.6rem;">
+                            ${kirim.statusKirim || 'Loading'}
+                        </span>
+                        <small class="fw-bold text-muted">SJ #${kirim.noSJ}</small>
+                    </div>
+                    
+                    <h6 class="fw-bold mb-1">${kirim.customer}</h6>
+                    <p class="text-muted small mb-2" style="font-size: 0.7rem;">
+                        <i class="fas fa-clock me-1"></i> Update: ${kirim.lastUpdate || '-'}
+                    </p>
+
+                    <div class="btn-group w-100 shadow-sm rounded-3 overflow-hidden" style="height: 35px;">
+                        <button onclick="updateStatusKirim('${id}', 'Loading')" class="btn btn-sm ${kirim.statusKirim === 'Loading' ? 'btn-primary' : 'btn-outline-primary'} border-0" style="font-size: 0.7rem;">MUAT</button>
+                        <button onclick="updateStatusKirim('${id}', 'OTW')" class="btn btn-sm ${kirim.statusKirim === 'OTW' ? 'btn-warning' : 'btn-outline-warning'} border-0" style="font-size: 0.7rem;">OTW</button>
+                        <button onclick="updateStatusKirim('${id}', 'Terkirim')" class="btn btn-sm ${kirim.statusKirim === 'Terkirim' ? 'btn-success' : 'btn-outline-success'} border-0" style="font-size: 0.7rem;">FINISH</button>
+                    </div>
+
+                    <div class="mt-2">
+                        ${kirim.fotoBukti ? `
+                            <a href="${kirim.fotoBukti}" target="_blank" class="btn btn-sm btn-light w-100 border text-success fw-bold" style="font-size: 0.7rem;">
+                                <i class="fas fa-check-circle me-1"></i> LIHAT SURAT JALAN
+                            </a>
+                        ` : `
+                            <button onclick="ambilFotoSJ('${id}')" class="btn btn-sm btn-light w-100 border text-primary fw-bold" style="font-size: 0.7rem;">
+                                <i class="fas fa-camera me-1"></i> UPLOAD BUKTI FOTO
+                            </button>
+                        `}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    });
+
+    container.innerHTML = html || '<div class="col-12 text-center py-4 text-muted small">Tidak ada data untuk tanggal ini.</div>';
+});
+
+// 1. Update status sederhana
+function updateStatusKirim(id, status) {
+    db.ref("pengiriman/" + id).update({
+        statusKirim: status,
+        lastUpdate: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+    });
+}
+
+// 2. Membuka Kamera
+function ambilFotoSJ(id) {
+    document.getElementById('tempIdPengiriman').value = id;
+    document.getElementById('inputFotoSJ').click();
+}
+
+function prosesUploadFoto(input) {
+    const file = input.files[0];
+    const idKirim = document.getElementById('tempIdPengiriman').value;
+    if (!file || !idKirim) return;
+
+    const CLOUD_NAME = "dz16gb8tw"; 
+    const UPLOAD_PRESET = "mayur groceries";
+
+    // Tampilkan Overlay Progress
+    const overlay = document.getElementById('upload-overlay');
+    const pbFill = document.getElementById('pb-fill');
+    const notifText = document.getElementById('notif-text');
+    
+    overlay.style.display = 'block';
+    notifText.innerText = "🚀 Memulai upload...";
+    pbFill.style.width = "0%";
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", UPLOAD_PRESET);
+    formData.append("folder", "bukti_pengiriman");
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, true);
+
+    // EVENT: Pantau Progres
+    xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            pbFill.style.width = percentComplete + "%";
+            notifText.innerText = `📤 Sedang Mengupload: ${percentComplete}%`;
+        }
+    };
+
+    // EVENT: Upload Selesai
+    xhr.onload = async function() {
+        if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            
+            // Notif Berhasil
+            notifText.className = "upload-notif text-success";
+            notifText.innerText = "✅ Berhasil Disimpan!";
+            pbFill.style.background = "#28a745";
+
+            // Update ke Firebase
+            await db.ref(`pengiriman/${idKirim}`).update({
+                fotoBukti: data.secure_url,
+                statusKirim: "Terkirim",
+                lastUpdate: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+            });
+
+            // Sembunyikan overlay setelah 2 detik
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                notifText.className = "upload-notif text-primary"; // Reset warna
+            }, 2000);
+
+        } else {
+            alert("Gagal mengunggah foto. Periksa koneksi internet.");
+            overlay.style.display = 'none';
+        }
+    };
+
+    xhr.onerror = function() {
+        alert("Terjadi kesalahan jaringan.");
+        overlay.style.display = 'none';
+    };
+
+    xhr.send(formData);
 }
 
 
@@ -3369,54 +3901,6 @@ function cetakHistoriSJ() {
 
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------
-
-// Variabel global untuk menampung link
-let urlAksesKaryawan = "";
-
-// 1. Fungsi Utama untuk Membuka Modal
-function shareKaryawanLink() {
-    // Membuat URL otomatis: namafile.html?view=karyawan
-    urlAksesKaryawan = window.location.origin + window.location.pathname + "?view=karyawan";
-    
-    const inputEl = document.getElementById('inputLinkKaryawan');
-    const modalEl = document.getElementById('modalShareKaryawan');
-
-    if (inputEl && modalEl) {
-        inputEl.value = urlAksesKaryawan;
-        
-        // Inisialisasi dan Tampilkan Modal
-        const myModal = new bootstrap.Modal(modalEl);
-        myModal.show();
-    } else {
-        console.error("Elemen modal atau input tidak ditemukan!");
-    }
-}
-
-// 2. Fungsi Copy Link ke Clipboard
-function copyLinkKaryawan(btn) {
-    const input = document.getElementById('inputLinkKaryawan');
-    
-    // Gunakan Clipboard API modern
-    navigator.clipboard.writeText(input.value).then(() => {
-        // Feedback visual sederhana
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check"></i> Siap!';
-        btn.classList.replace('btn-primary', 'btn-dark');
-        
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.classList.replace('btn-dark', 'btn-primary');
-        }, 2000);
-    }).catch(err => {
-        console.error("Gagal menyalin: ", err);
-    });
-}
-
-// 3. Fungsi Kirim WhatsApp
-function shareKeWA() {
-    const pesan = encodeURIComponent("Halo Tim, berikut link rundown pekerjaan Mayur Groceries hari ini: " + urlAksesKaryawan);
-    window.open(`https://wa.me/?text=${pesan}`, '_blank');
-}
 
 // Variabel untuk menampung link customer secara global
 let linkLiveTracking = "";

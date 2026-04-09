@@ -142,9 +142,9 @@
                 <div class="nav nav-pills bg-light p-1 rounded-pill shadow-sm flex-nowrap" id="pills-tab" role="tablist" style="overflow-x: auto;">
                     <button class="nav-link active rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-operasional" type="button">📦 Operasional</button>
                     <button class="nav-link rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-master" type="button">📂 Master</button>
-                    <button class="nav-link rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-inventori" type="button">📅 Stok</button>
-                    <button class="nav-link rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-jurnal" type="button">📖 Jurnal</button>
                     <button class="nav-link rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-rundown" type="button">📋 Rundown</button>
+                    <button class="nav-link rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-inventori" type="button">📅 Stok</button>
+                    <button class="nav-link rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-jurnal" type="button">📖 Jurnal</button>                
                     <button class="nav-link rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-penjualan" type="button">📄 S. Jalan</button>
                     <button class="nav-link rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-invoice" type="button">💰 Invoice</button>
                     <button class="nav-link rounded-pill py-1 px-3 small fw-bold" data-bs-toggle="pill" data-bs-target="#tab-histori" type="button">📅Histori</button>
@@ -165,12 +165,12 @@
                 <div class="nav nav-pills flex-column gap-2" role="tablist">
                     <button class="nav-link active text-start py-3 shadow-sm" data-bs-toggle="pill" data-bs-target="#tab-operasional" onclick="tutupMenu()">📦 Operasional</button>
                     <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-master" onclick="tutupMenu()">📂 Master Data</button>
+                    <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-rundown" onclick="tutupMenu()">📋 Rundown</button>
                     <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-inventori" onclick="tutupMenu()">📅 Stok Barang</button>
                     <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-jurnal" onclick="tutupMenu()">📖 Jurnal Umum</button>
-                    <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-rundown" onclick="tutupMenu()">📋 Rundown</button>
                     <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-penjualan" onclick="tutupMenu()">📄 Surat Jalan</button>
-                    <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-invoice" onclick="sinkronkanInvoice(); tutupMenu()">💰 Invoice</button>
                     <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-invoice" onclick="muatDaftarHistori()">📅Histori</button>
+                    <button class="nav-link text-start py-3 shadow-sm border" data-bs-toggle="pill" data-bs-target="#tab-invoice" onclick="sinkronkanInvoice(); tutupMenu()">💰 Invoice</button>
                     <button class="nav-link text-start py-3 shadow-sm bg-warning text-dark border-0" data-bs-toggle="pill" data-bs-target="#tab-view-customer" onclick="tutupMenu()">👀 View Customer</button>
                     <hr class="my-4">
                     
@@ -456,40 +456,112 @@
                 <div class="card border-0 shadow-sm rounded-4 mb-4">
                     <div class="card-body py-3">
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-                            
                             <div class="d-flex align-items-center gap-3">
                                 <div class="bg-primary bg-opacity-10 p-3 rounded-3 d-none d-sm-block">
                                     <i class="fas fa-clipboard-list text-primary fs-4"></i>
                                 </div>
                                 <div>
-                                    <h5 class="fw-bold text-dark m-0">Rundown Kerja Petugas</h5>
+                                    <h5 id="title-rundown" class="fw-bold text-dark m-0">Rundown Kerja Petugas</h5>
                                     <p class="text-muted small m-0">Pantau proses belanja hingga siap kirim</p>
                                 </div>
                             </div>
-
                             <div class="d-flex align-items-center gap-2 ms-auto ms-md-0">
-                                <div class="position-relative">
-                                    <input type="date" id="filterTglRundown" 
-                                        class="form-control form-control-sm border-primary border-opacity-25 rounded-pill px-3" 
-                                        style="width: 160px; height: 38px;">
-                                </div>
-
-                                <button class="btn btn-primary fw-bold shadow-sm rounded-pill px-3 d-flex align-items-center gap-2" 
-                                        onclick="shareKaryawanLink()" style="height: 38px;">
+                                <input type="date" id="filterTglRundown" class="form-control form-control-sm border-primary border-opacity-25 rounded-pill px-3" style="width: 160px; height: 38px;">
+                                <button class="btn btn-primary fw-bold shadow-sm rounded-pill px-3 d-flex align-items-center gap-2" onclick="shareKaryawanLink()" style="height: 38px;">
                                     <i class="fas fa-share-nodes"></i>
                                     <span class="d-none d-sm-inline">Share Akses</span>
                                 </button>
                             </div>
-
                         </div>
                     </div>
                 </div>
-                
+
+                <div id="section-announcement" class="mb-4">
+                    <div class="card border-0 shadow-sm rounded-4" style="background-color: #fff9db;">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold m-0 text-warning-emphasis">
+                                    <i class="fas fa-bullhorn me-2"></i> Papan Pengumuman & SOP
+                                </h6>
+                                <button id="btn-edit-sop" class="btn btn-sm btn-warning shadow-sm fw-bold px-3 rounded-pill" data-bs-toggle="collapse" data-bs-target="#collapseEditSOP" style="font-size: 0.75rem;">
+                                    <i class="fas fa-edit me-1"></i> Edit SOP
+                                </button>
+                            </div>
+
+                            <div id="displaySOP" class="small text-dark lh-sm" style="white-space: pre-line;">
+                                Memuat pengumuman terbaru...
+                            </div>
+
+                            <div class="collapse mt-3" id="collapseEditSOP">
+                                <textarea id="inputSOP" class="form-control form-control-sm mb-2" rows="3" placeholder="Masukkan SOP Baru..."></textarea>
+                                
+                                <button id="btn-save-sop" class="btn btn-sm btn-primary shadow-sm fw-bold px-3 rounded-pill w-100" onclick="updateSOP()">
+                                    <i class="fas fa-save me-1"></i> Simpan Pengumuman
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="section-admin-input" class="mb-4">
+                    <div class="card border-0 shadow-sm rounded-4">
+                        <div class="card-header bg-white border-0 py-3" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#collapseOrderInput">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold m-0 text-primary"><i class="fas fa-plus-circle me-2"></i> Input Pesanan Customer Baru</h6>
+                                <i class="fas fa-chevron-down text-muted"></i>
+                            </div>
+                        </div>
+                        <div class="collapse" id="collapseOrderInput">
+                            <div class="card-body pt-0">
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-8">
+                                        <input type="text" id="custJudul" class="form-control form-control-sm" placeholder="Judul Pesanan (Contoh: Orderan Bu Siska)">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="date" id="custTanggal" class="form-control form-control-sm">
+                                    </div>
+                                </div>
+                                <div id="container-input-item"></div>
+                                
+                                <div class="d-flex gap-2 mt-3">
+                                    <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="tambahBarisItem()">+ Tambah Baris</button>
+                                    <button class="btn btn-sm btn-primary rounded-pill px-4 ms-auto" onclick="prosesPesananBaru()">Proses Jadi Rundown</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="rundown-container" class="row g-3">
                     <p class="text-center py-5 text-muted">Memuat data tugas...</p>
                 </div>
+
+                <div id="section-logistik" class="mt-5 mb-5">
+                    <div class="d-flex align-items-center justify-content-between mb-3 px-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="bg-primary p-2 rounded-3 shadow-sm">
+                                <i class="fas fa-truck text-white"></i>
+                            </div>
+                            <div>
+                                <h5 class="fw-bold m-0 text-dark">Status Pengiriman</h5>
+                                <small class="text-muted">Pantau keberangkatan & bukti kirim</small>
+                            </div>
+                        </div>
+                        <span id="count-logistik" class="badge rounded-pill bg-primary">0 SJ</span>
+                    </div>
+
+                    <div id="logistik-container" class="row g-3">
+                        <div class="col-12 text-center py-4 text-muted small">
+                            <i class="fas fa-box-open d-block mb-2 fa-2x opacity-25"></i>
+                            Menunggu antrean muatan...
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
+
+            <!------------------------------------------------------------------------------------------------------------------------------------>
 
 
             <div class="tab-pane fade" id="tab-inventori">
@@ -674,16 +746,20 @@
                             <button onclick="sinkronkanInvoice()" class="btn btn-primary btn-sm px-4 rounded-pill fw-bold">🔄 Segarkan Data & Hitung Total</button>
                             <button onclick="window.print()" class="btn btn-outline-dark btn-sm px-4 rounded-pill">🖨️ Cetak Invoice</button>
                             <button onclick="arsipTransaksi()" class="btn btn-primary btn-sm px-4 rounded-pill fw-bold shadow-sm">
-                            💾 Simpan & Selesaikan Transaksi
-                        </button>
+                                💾 Simpan & Selesaikan Transaksi
+                            </button>
                         </div>
-                        <div id="section-riwayat" class="mt-4 p-3 border rounded bg-light no-print">
-                            <h5><i class="fas fa-history"></i> Riwayat Surat Jalan (Siap Cetak Invoice)</h5>
-                            <hr>
-                            <div id="daftar-riwayat-sj" style="max-height: 400px; overflow-y: auto;">
-                                <p class="text-muted">Memuat riwayat...</p>
+                        
+                        <div id="upload-overlay" style="display:none; position:fixed; bottom:20px; right:20px; z-index:9999; width:280px;" class="card shadow-lg border-0 rounded-4 p-3 bg-white">
+                            <div id="notif-text" class="upload-notif text-primary">Preparing upload...</div>
+                            <div class="progress-container" style="display:block;">
+                                <div id="pb-fill" class="progress-bar-fill"></div>
                             </div>
+                            <small class="text-muted" style="font-size: 0.65rem;">Mohon jangan tutup halaman ini...</small>
                         </div>
+
+                        <input type="file" id="inputFotoSJ" accept="image/*" capture="environment" style="display: none;" onchange="prosesUploadFoto(this)">
+                        <input type="hidden" id="tempIdPengiriman">
                     </div>
 
                     <div id="area-cetak-invoice" class="p-4 bg-white mx-auto" style="width: 100%; max-width: 1150px; min-height: 155mm; color: #000; font-family: 'Arial', sans-serif; border: 1px solid #000; box-sizing: border-box;">
@@ -1065,10 +1141,9 @@
 </div>
 
 
-
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
